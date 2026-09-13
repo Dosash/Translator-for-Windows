@@ -1,0 +1,53 @@
+# Auto-detect text files and normalize line endings to LF in the repo; Git converts to the
+# platform's native line ending on checkout.
+* text=auto
+
+# Sources: always LF in the repo, CRLF on checkout (Windows tooling — Visual Studio, dotnet
+# format — expects CRLF locally; diffs stay clean because Git normalizes on the way in).
+*.cs text eol=crlf diff=csharp
+*.xaml text eol=crlf
+*.csproj text eol=crlf
+*.slnx text eol=crlf
+*.props text eol=crlf
+*.targets text eol=crlf
+*.config text eol=crlf
+*.manifest text eol=crlf
+*.json text eol=crlf
+*.editorconfig text eol=crlf
+
+# PowerShell: CRLF (the ecosystem's convention; also avoids surprises with #requires / signing).
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# Shell scripts referenced from CI or docs must keep LF even on Windows checkouts.
+*.sh text eol=lf
+
+# Inno Setup script — CRLF (Windows-only tool, and the IDE/compiler are happiest with it).
+*.iss text eol=crlf
+
+# Docs and YAML: LF everywhere.
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Binaries — never touch, never diff as text.
+*.ico binary
+*.icns binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.onnx binary
+*.spm binary
+*.pdb binary
+*.dll binary
+*.exe binary
+*.zip binary
+*.snk binary
+
+# Diff hints
+*.cs diff=csharp
