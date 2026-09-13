@@ -1,0 +1,218 @@
+<w:AuxWindow x:Class="Translator.UI.Windows.SettingsWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Translator.UI"
+             xmlns:c="clr-namespace:Translator.UI.Controls"
+             xmlns:w="clr-namespace:Translator.UI.Windows"
+             Title="{ui:Loc settings}">
+    <w:AuxWindow.Resources>
+        <DataTemplate x:Key="ThemeCardTemplate">
+            <RadioButton Margin="3" Style="{StaticResource OptionCard}" GroupName="SettingsTheme"
+                         IsChecked="{Binding IsSelected, Mode=OneWay}" Checked="OnThemeChecked"
+                         AutomationProperties.Name="{Binding Name}">
+                <StackPanel>
+                    <Grid>
+                        <Border Width="30" Height="22" CornerRadius="6" HorizontalAlignment="Left" BorderThickness="1"
+                                BorderBrush="{DynamicResource ControlStrokeBrush}" Background="{Binding Swatch}">
+                            <Ellipse Width="11" Height="11" Fill="{Binding Accent}" />
+                        </Border>
+                        <Grid Width="16" Height="16" HorizontalAlignment="Right" VerticalAlignment="Top"
+                              Visibility="{Binding IsSelected, Converter={StaticResource VisibleWhen}}">
+                            <Ellipse Fill="{DynamicResource SageBrush}" />
+                            <TextBlock Style="{StaticResource IconText}" FontSize="8.5" Foreground="White" Text="{x:Static ui:Icons.Check}" />
+                        </Grid>
+                    </Grid>
+                    <TextBlock Margin="0,8,0,0" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Name}" />
+                    <TextBlock Style="{StaticResource CaptionText}" FontSize="11" Text="{Binding Caption}" />
+                </StackPanel>
+            </RadioButton>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SizeCardTemplate">
+            <RadioButton Margin="3" Style="{StaticResource OptionCard}" GroupName="SettingsPanelSize"
+                         IsChecked="{Binding IsSelected, Mode=OneWay}" Checked="OnSizeChecked"
+                         AutomationProperties.Name="{Binding Name}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Grid Width="14" Height="14" VerticalAlignment="Center">
+                            <Ellipse Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.5"
+                                     Visibility="{Binding IsSelected, Converter={StaticResource CollapsedWhen}}" />
+                            <Ellipse Fill="{DynamicResource SageBrush}"
+                                     Visibility="{Binding IsSelected, Converter={StaticResource VisibleWhen}}" />
+                            <TextBlock Style="{StaticResource IconText}" FontSize="7.5" Foreground="White" Text="{x:Static ui:Icons.Check}"
+                                       Visibility="{Binding IsSelected, Converter={StaticResource VisibleWhen}}" />
+                        </Grid>
+                        <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" FontSize="12.5" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" Text="{Binding Name}" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0" FontSize="11" Text="{Binding Caption}" />
+                </StackPanel>
+            </RadioButton>
+        </DataTemplate>
+    </w:AuxWindow.Resources>
+
+    <ScrollViewer x:Name="Scroller" Width="460" Height="560" Focusable="False"
+                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="18,18,18,20">
+            <!-- Header -->
+            <StackPanel Orientation="Horizontal">
+                <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource SageBrush}">
+                    <TextBlock Style="{StaticResource IconText}" FontSize="16" Foreground="White" Text="{x:Static ui:Icons.Settings}" />
+                </Border>
+                <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource TitleText}" Text="{ui:Loc settings}" />
+                    <TextBlock Style="{StaticResource SubtitleText}" Text="{ui:Loc settings.subtitle}" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Language -->
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{ui:Loc section.language, Upper=True}" />
+            <Border Style="{StaticResource Card}">
+                <DockPanel>
+                    <c:LanguagePicker x:Name="UiLanguagePicker" DockPanel.Dock="Right" Margin="12,0,0,0" MinWidth="150"
+                                      VerticalAlignment="Center" Style="{StaticResource CapsulePicker}"
+                                      SelectedCode="{Binding AppLanguage, Converter={StaticResource EnumToString}}"
+                                      AutomationProperties.Name="{ui:Loc section.language}" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource RowTitleText}" Text="{ui:Loc section.language}" />
+                        <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc language.caption}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Theme -->
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{ui:Loc section.theme, Upper=True}" />
+            <Border Style="{StaticResource Card}" Padding="11">
+                <ItemsControl x:Name="ThemeCards" Focusable="False" ItemTemplate="{StaticResource ThemeCardTemplate}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="3" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </Border>
+
+            <!-- Panel size -->
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{ui:Loc section.panel, Upper=True}" />
+            <Border Style="{StaticResource Card}" Padding="11">
+                <ItemsControl x:Name="SizeCards" Focusable="False" ItemTemplate="{StaticResource SizeCardTemplate}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="3" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </Border>
+
+            <!-- Hotkeys -->
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{ui:Loc section.hotkeys, Upper=True}" />
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <c:HotkeyRecorder DockPanel.Dock="Right" Margin="12,0,0,0" Hotkey="{Binding SelectionHotkey}"
+                                          RecordingChanged="OnRecordingChanged"
+                                          ToolTip="{ui:Loc hotkey.recorder.help}" AutomationProperties.Name="{ui:Loc hotkey.selection}" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource RowTitleText}" Text="{ui:Loc hotkey.selection}" />
+                            <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc hotkey.selection.caption}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <Border Style="{StaticResource Divider}" Margin="0,12" />
+                    <DockPanel>
+                        <c:HotkeyRecorder DockPanel.Dock="Right" Margin="12,0,0,0" Hotkey="{Binding ClipboardHotkey}"
+                                          RecordingChanged="OnRecordingChanged"
+                                          ToolTip="{ui:Loc hotkey.recorder.help}" AutomationProperties.Name="{ui:Loc hotkey.clipboard}" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource RowTitleText}" Text="{ui:Loc hotkey.clipboard}" />
+                            <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc hotkey.clipboard.caption}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <Border Style="{StaticResource Divider}" Margin="0,12" />
+                    <DockPanel>
+                        <c:HotkeyRecorder DockPanel.Dock="Right" Margin="12,0,0,0" Hotkey="{Binding PanelHotkey}"
+                                          RecordingChanged="OnRecordingChanged"
+                                          ToolTip="{ui:Loc hotkey.recorder.help}" AutomationProperties.Name="{ui:Loc hotkey.panel}" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource RowTitleText}" Text="{ui:Loc hotkey.panel}" />
+                            <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc hotkey.panel.caption}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <Border Margin="0,12,0,0" Style="{StaticResource ErrorBox}"
+                            Visibility="{Binding HotkeyError, Converter={StaticResource VisibleWhen}}">
+                        <TextBlock TextWrapping="Wrap" FontSize="11.5" Foreground="{DynamicResource RoseInkBrush}" Text="{Binding HotkeyError}" />
+                    </Border>
+                    <Border Style="{StaticResource Divider}" Margin="0,12" />
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Margin="0,2,8,0" VerticalAlignment="Top" Style="{StaticResource IconText}"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" Text="{x:Static ui:Icons.Shield}" />
+                        <TextBlock Style="{StaticResource CaptionText}" Margin="0" Text="{ui:Loc hotkey.admin.note}" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Behavior -->
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{ui:Loc section.behavior, Upper=True}" />
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <CheckBox DockPanel.Dock="Right" Margin="12,0,0,0" Style="{StaticResource ToggleSwitch}"
+                                  IsChecked="{Binding AutoTranslate}" AutomationProperties.Name="{ui:Loc auto.translate}" />
+                        <TextBlock VerticalAlignment="Center" Style="{StaticResource RowTitleText}" Text="{ui:Loc auto.translate}" />
+                    </DockPanel>
+                    <Border Style="{StaticResource Divider}" Margin="0,12" />
+                    <DockPanel>
+                        <CheckBox DockPanel.Dock="Right" Margin="12,0,0,0" Style="{StaticResource ToggleSwitch}"
+                                  IsChecked="{Binding OfflineOnly}" AutomationProperties.Name="{ui:Loc offline.only}" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource RowTitleText}" Text="{ui:Loc offline.only}" />
+                            <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc offline.only.caption}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <Border Style="{StaticResource Divider}" Margin="0,12" />
+                    <DockPanel>
+                        <CheckBox DockPanel.Dock="Right" Margin="12,0,0,0" Style="{StaticResource ToggleSwitch}"
+                                  IsChecked="{Binding LaunchAtLogin}" AutomationProperties.Name="{ui:Loc launch.login}" />
+                        <TextBlock VerticalAlignment="Center" Style="{StaticResource RowTitleText}" Text="{ui:Loc launch.login}" />
+                    </DockPanel>
+                    <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="11.5" Foreground="{DynamicResource RoseInkBrush}"
+                               Text="{Binding LoginItemMessage}"
+                               Visibility="{Binding LoginItemMessage, Converter={StaticResource VisibleWhen}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Updates -->
+            <TextBlock Style="{StaticResource SectionTitleText}" Text="{ui:Loc section.updates, Upper=True}" />
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Margin="12,0,0,0" Click="OnCheckUpdatesClick"
+                                IsEnabled="{Binding IsCheckingForUpdates, Converter={StaticResource Falsy}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PillButton}">
+                                    <Setter Property="Content" Value="{ui:Loc check}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsCheckingForUpdates}" Value="True">
+                                            <Setter Property="Content" Value="{ui:Loc checking}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource RowTitleText}" Text="{ui:Loc check.version}" />
+                            <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc update.caption}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" FontSize="11.5" Foreground="{DynamicResource InkStrongBrush}"
+                               Text="{Binding UpdateMessage}" Visibility="{Binding UpdateMessage, Converter={StaticResource VisibleWhen}}" />
+                    <Button Margin="0,6,0,0" HorizontalAlignment="Left" Style="{StaticResource LinkButton}"
+                            Content="{ui:Loc update.download}" Click="OnDownloadUpdateClick"
+                            Visibility="{Binding UpdateUrl, Converter={StaticResource VisibleWhen}}" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Name="VersionText" Margin="0,16,0,0" HorizontalAlignment="Center" TextWrapping="Wrap"
+                       TextAlignment="Center" FontSize="11" Foreground="{DynamicResource InkFaintBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</w:AuxWindow>

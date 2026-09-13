@@ -311,6 +311,40 @@ public class TranslatorModelTests : IDisposable
     }
 
     [Fact]
+    public async Task ExplicitTranslateAfterSettingInput_WithAutoTranslate_TranslatesOnce()
+    {
+        var (model, settings, history, online, _, _, _) = Build(source: "en", target: "ru");
+        settings.AutoTranslate = true;
+        online.Handler = (_, _, _) => Task.FromResult(new OnlineTranslation("привет", null));
+
+        model.InputText = "hello";
+        model.Translate();
+        await model.CurrentTranslationTask!;
+        await Task.Delay(1000); // past the 700 ms auto-translate debounce
+
+        Assert.Single(online.Calls);
+        Assert.Single(history.Entries);
+    }
+
+    [Fact]
+    public async Task AutoTranslate_StillTranslatesAfterTyping()
+    {
+        var (model, settings, _, online, _, _, _) = Build(source: "en", target: "ru");
+        settings.AutoTranslate = true;
+        online.Handler = (_, _, _) => Task.FromResult(new OnlineTranslation("привет", null));
+
+        model.InputText = "hello";
+        await Task.Delay(1000);
+        if (model.CurrentTranslationTask is { } task)
+        {
+            await task;
+        }
+
+        Assert.Single(online.Calls);
+        Assert.Equal("привет", model.OutputText);
+    }
+
+    [Fact]
     public void CharCounterAndLimitFlags()
     {
         var (model, _, _, _, _, _, _) = Build();

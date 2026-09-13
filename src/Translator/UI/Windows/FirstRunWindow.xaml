@@ -1,0 +1,76 @@
+<w:AuxWindow x:Class="Translator.UI.Windows.FirstRunWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Translator.UI"
+             xmlns:c="clr-namespace:Translator.UI.Controls"
+             xmlns:w="clr-namespace:Translator.UI.Windows"
+             Title="{ui:Loc first.title}">
+    <StackPanel Width="460">
+        <StackPanel Margin="20">
+            <StackPanel Orientation="Horizontal">
+                <c:LogoMark Size="42" VerticalAlignment="Center" />
+                <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource TitleText}" FontSize="21" Text="{ui:Loc first.title}" />
+                    <TextBlock Style="{StaticResource SubtitleText}" FontSize="12.5" Foreground="{DynamicResource SecondaryTextBrush}"
+                               Text="{ui:Loc first.subtitle}" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border Margin="0,16,0,0" Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <Path x:Name="TrayGlyphPath" DockPanel.Dock="Left" Width="18" Height="18" Margin="1,1,11,0"
+                              VerticalAlignment="Top" Stretch="Uniform" Fill="{DynamicResource SageBrush}" />
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource RowTitleText}" FontWeight="SemiBold" Text="{ui:Loc first.tray.title}" />
+                            <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc first.tray.caption}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <Border Style="{StaticResource Divider}" Margin="0,12" />
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Width="20" Margin="0,1,10,0" VerticalAlignment="Top" FontSize="15"
+                                   Style="{StaticResource IconText}" Foreground="{DynamicResource SageBrush}" Text="{x:Static ui:Icons.Keyboard}" />
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource RowTitleText}" FontWeight="SemiBold" Text="{ui:Loc section.hotkeys}" />
+                            <TextBlock x:Name="HotkeysCaption" Style="{StaticResource CaptionText}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <Border Style="{StaticResource Divider}" Margin="0,12" />
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Width="20" Margin="0,1,10,0" VerticalAlignment="Top" FontSize="15"
+                                   Style="{StaticResource IconText}" Foreground="{DynamicResource SageBrush}" Text="{x:Static ui:Icons.Download}" />
+                        <Button DockPanel.Dock="Right" Margin="12,0,0,0" Style="{StaticResource PillButton}"
+                                Content="{ui:Loc open}" Click="OnOpenOfflineClick" />
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource RowTitleText}" FontWeight="SemiBold" Text="{ui:Loc offline.languages}" />
+                            <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc offline.download.caption}" />
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,16,0,0" Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource RowTitleText}" FontWeight="SemiBold" Text="{ui:Loc section.theme}" />
+                    <ItemsControl x:Name="ThemeChoices" Margin="-3,10,-3,0" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="3" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <RadioButton Margin="3" Style="{StaticResource OptionCapsule}" GroupName="FirstRunTheme"
+                                             IsChecked="{Binding IsSelected, Mode=OneWay}" Checked="OnThemeChecked"
+                                             Content="{Binding Name}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Button Margin="0,16,0,0" HorizontalAlignment="Right" Style="{StaticResource PillButton}" IsDefault="True"
+                    Content="{ui:Loc done}" Click="OnDoneClick" />
+        </StackPanel>
+    </StackPanel>
+</w:AuxWindow>
