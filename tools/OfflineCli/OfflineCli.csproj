@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>OfflineCli</RootNamespace>
+    <AssemblyName>OfflineCli</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Translator.Offline\Translator.Offline.csproj" />
+  </ItemGroup>
+
+</Project>

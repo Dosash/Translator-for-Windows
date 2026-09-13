@@ -37,3 +37,9 @@ public sealed class OfflineTranslationException : Exception
 {
     public OfflineTranslationException(string message, Exception? inner = null) : base(message, inner) { }
 }
+
+/// <summary>Download, removal or update check failed (network, HTTP error, corrupted file, disk).</summary>
+public sealed class OfflineDownloadException : Exception
+{
+    public OfflineDownloadException(string message, Exception? inner = null) : base(message, inner) { }
+}
