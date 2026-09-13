@@ -22,7 +22,10 @@ public partial class PanelWindow : FloatingWindow
         InitializeComponent();
         DataContext = model;
         settings.PropertyChanged += OnSettingsPropertyChanged;
+        model.PropertyChanged += OnModelPropertyChanged;
+        L10n.LanguageChanged += (_, _) => UpdatePrivacyCapsule();
         ApplyPanelSize();
+        UpdatePrivacyCapsule();
     }
 
     public event EventHandler? QuitRequested;
@@ -65,6 +68,26 @@ public partial class PanelWindow : FloatingWindow
         {
             ApplyPanelSize();
         }
+        else if (e.PropertyName == nameof(SettingsStore.OfflineOnly))
+        {
+            UpdatePrivacyCapsule();
+        }
+    }
+
+    private void OnModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TranslatorModel.Engine))
+        {
+            UpdatePrivacyCapsule();
+        }
+    }
+
+    private void UpdatePrivacyCapsule()
+    {
+        var content = PrivacyCapsule.Describe(_model.Engine, _settings.OfflineOnly);
+        PrivacyIcon.Text = content.Glyph;
+        PrivacyLabel.Text = content.Label ?? string.Empty;
+        PrivacyLabel.Visibility = content.Label is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void OnSwapClick(object sender, RoutedEventArgs e) => _model.SwapLanguages();

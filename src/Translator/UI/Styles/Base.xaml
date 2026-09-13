@@ -12,7 +12,6 @@
     <ui:TruthyConverter x:Key="Truthy" />
     <ui:TruthyConverter x:Key="Falsy" Invert="True" />
     <ui:EnumToStringConverter x:Key="EnumToString" />
-    <ui:EngineGlyphConverter x:Key="EngineGlyph" />
 
     <!-- Keyboard focus visuals (WPF shows them only for keyboard focus = focus-visible). -->
     <Style x:Key="RoundedFocusVisual">

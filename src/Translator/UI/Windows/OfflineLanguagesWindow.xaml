@@ -4,13 +4,13 @@
              xmlns:ui="clr-namespace:Translator.UI"
              xmlns:c="clr-namespace:Translator.UI.Controls"
              xmlns:w="clr-namespace:Translator.UI.Windows"
-             Title="{ui:Loc offline.languages}">
+             Title="{ui:Loc offline.languages, TrimEllipsis=True}">
     <StackPanel Width="400">
         <StackPanel Margin="18">
             <StackPanel Orientation="Horizontal">
                 <c:LogoMark Size="30" VerticalAlignment="Center" />
                 <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource TitleText}" FontSize="16"
-                           Text="{ui:Loc offline.languages}" />
+                           Text="{ui:Loc offline.languages, TrimEllipsis=True}" />
             </StackPanel>
 
             <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}" Foreground="{DynamicResource InkMutedBrush}"

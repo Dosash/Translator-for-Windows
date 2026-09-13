@@ -19,16 +19,16 @@
                 <TextBlock Style="{StaticResource TitleText}" Text="{ui:Loc app.title}" />
                 <TextBlock Style="{StaticResource SubtitleText}" Text="{ui:Loc app.subtitle}" />
             </StackPanel>
+            <!-- Short capsule; the full privacy sentence is in the tooltip. -->
             <Border Grid.Column="2" Style="{StaticResource Capsule}" Margin="10,0,0,0"
                     HorizontalAlignment="Right" VerticalAlignment="Center"
-                    ToolTip="{Binding EnginePrivacyText}">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource IconText}" Margin="0,0,5,0" FontSize="10.5"
-                               Foreground="{DynamicResource SageBrush}"
-                               Text="{Binding Engine, Converter={StaticResource EngineGlyph}}" />
-                    <TextBlock VerticalAlignment="Center" FontSize="10.5" FontWeight="Medium" TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource SageBrush}" Text="{Binding EnginePrivacyText}" />
-                </DockPanel>
+                    ToolTip="{Binding EnginePrivacyText}" AutomationProperties.Name="{Binding EnginePrivacyText}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="PrivacyIcon" Style="{StaticResource IconText}" FontSize="10.5"
+                               Foreground="{DynamicResource SageBrush}" />
+                    <TextBlock x:Name="PrivacyLabel" Margin="5,0,0,0" VerticalAlignment="Center" FontSize="10.5" FontWeight="Medium"
+                               TextTrimming="CharacterEllipsis" Foreground="{DynamicResource SageBrush}" />
+                </StackPanel>
             </Border>
         </Grid>
 
@@ -135,29 +135,32 @@
         <!-- Footer -->
         <Grid Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <Ellipse Width="7" Height="7" VerticalAlignment="Center">
-                <Ellipse.Style>
-                    <Style TargetType="Ellipse">
-                        <Setter Property="Fill" Value="{DynamicResource RoseBrush}" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding OfflineReady}" Value="True">
-                                <Setter Property="Fill" Value="{DynamicResource SageBrush}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Ellipse.Style>
-            </Ellipse>
-            <TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="11"
-                       TextTrimming="CharacterEllipsis" Foreground="{DynamicResource InkMutedBrush}"
-                       Text="{Binding OfflineStatusText}" ToolTip="{Binding OfflineStatusText}" />
-            <Button Grid.Column="2" Margin="8,0,6,0" Style="{StaticResource LinkButton}" FontSize="11.5"
+            <!-- The status wraps to a second line in narrow panels instead of being cut off. -->
+            <DockPanel VerticalAlignment="Center">
+                <Ellipse DockPanel.Dock="Left" Width="7" Height="7" Margin="0,4,8,0" VerticalAlignment="Top">
+                    <Ellipse.Style>
+                        <Style TargetType="Ellipse">
+                            <Setter Property="Fill" Value="{DynamicResource RoseBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding OfflineReady}" Value="True">
+                                    <Setter Property="Fill" Value="{DynamicResource SageBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Ellipse.Style>
+                </Ellipse>
+                <TextBlock FontSize="11" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="30"
+                           LineStackingStrategy="BlockLineHeight" LineHeight="15"
+                           Foreground="{DynamicResource InkMutedBrush}"
+                           Text="{Binding OfflineStatusText}" ToolTip="{Binding OfflineStatusText}" />
+            </DockPanel>
+            <Button Grid.Column="1" Margin="8,0,6,0" Style="{StaticResource LinkButton}" FontSize="11.5"
                     Content="{ui:Loc offline.languages}" Click="OnOfflineLanguagesClick" />
-            <StackPanel Grid.Column="3" Orientation="Horizontal">
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
                 <Button Style="{StaticResource GhostIconButton}" Content="{x:Static ui:Icons.History}" Click="OnHistoryClick"
                         ToolTip="{ui:Loc history}" AutomationProperties.Name="{ui:Loc history}" />
                 <Button Style="{StaticResource GhostIconButton}" Content="{x:Static ui:Icons.Settings}" Click="OnSettingsClick"

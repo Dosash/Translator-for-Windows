@@ -44,16 +44,6 @@ public sealed class TruthyConverter : IValueConverter
         throw new NotSupportedException();
 }
 
-/// <summary>For radio-style cards: IsChecked = (value == parameter); checking selects the parameter's enum value.</summary>
-public sealed class EnumEqualsConverter : IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is not null && string.Equals(value.ToString(), parameter?.ToString(), StringComparison.Ordinal);
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is true && parameter is not null ? Enum.Parse(targetType, parameter.ToString()!) : Binding.DoNothing;
-}
-
 public sealed class EnumToStringConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value?.ToString();
@@ -62,35 +52,25 @@ public sealed class EnumToStringConverter : IValueConverter
         value is string text && Enum.TryParse(targetType, text, out var result) ? result! : Binding.DoNothing;
 }
 
-public sealed class UpperCaseConverter : IValueConverter
+/// <summary>Post-processes text from <see cref="LocExtension"/>: upper-cased section titles, window titles without "…".</summary>
+public sealed class LocTextConverter : IValueConverter
 {
-    public static readonly UpperCaseConverter Instance = new();
+    public bool Upper { get; init; }
 
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is string text ? text.ToUpper(L10n.CultureFor(L10n.CurrentCode)) : value;
+    public bool TrimEllipsis { get; init; }
 
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        throw new NotSupportedException();
-}
-
-/// <summary>
-/// MultiBinding: [0] = an L10n key, [1] = any <see cref="LocalizationSource"/> indexer binding (only there so the
-/// text re-evaluates when the UI language changes).
-/// </summary>
-public sealed class LocKeyConverter : IMultiValueConverter
-{
-    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture) =>
-        values.Length > 0 && values[0] is string key ? L10n.T(key) : string.Empty;
-
-    public object[] ConvertBack(object value, Type[] targetTypes, object? parameter, CultureInfo culture) =>
-        throw new NotSupportedException();
-}
-
-/// <summary>Privacy capsule icon: globe after an online translation, lock otherwise.</summary>
-public sealed class EngineGlyphConverter : IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is EngineKind.Google ? Icons.Globe : Icons.Lock;
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not string text)
+        {
+            return value;
+        }
+        if (TrimEllipsis)
+        {
+            text = TextFormat.TrimTrailingEllipsis(text);
+        }
+        return Upper ? text.ToUpper(L10n.CultureFor(L10n.CurrentCode)) : text;
+    }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
