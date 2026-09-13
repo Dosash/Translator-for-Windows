@@ -233,3 +233,4 @@ The English text is the source of truth for meaning.
 | error.offline.timeout | The offline engine didn't respond. |
 | error.speech.voice | No voice is installed for {0}. Add one in Windows Settings → Time & language → Speech. |
 | error.speech.failed | Couldn't speak the text: {0} |
+| error.replace.failed | Couldn't insert the translation. Copy it and paste it manually. |

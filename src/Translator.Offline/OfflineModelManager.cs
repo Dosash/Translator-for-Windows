@@ -621,7 +621,8 @@ public sealed class OfflineModelManager : IOfflineTranslator, IDisposable
     private sealed class ProgressAggregator(string languageCode, long totalBytes, IProgress<OfflineDownloadProgress>? progress)
     {
         private readonly ConcurrentDictionary<string, long> _files = new(StringComparer.Ordinal);
-        private long _lastReport = long.MinValue;
+        // Not long.MinValue: "now - last" would overflow and suppress every intermediate report.
+        private long _lastReport;
 
         public void Seed(string file, long bytes) => _files[file] = bytes;
 
