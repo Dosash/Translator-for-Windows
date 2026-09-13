@@ -1,0 +1,44 @@
+# Build output
+bin/
+obj/
+out/
+dist/
+publish/
+artifacts/
+TestResults/
+*.binlog
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.rsuser
+
+# Offline models downloaded during local testing
+models/
+*.onnx
+*.spm
+
+# Logs and OS metadata
+*.log
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Secrets and signing material — never commit
+*.pfx
+*.p12
+*.snk
+*.pem
+*.key
+.env
+.env.*
+secrets.json
+
+# Local project notes
+TASKS.md
+NOTES.md
+ЖУРНАЛ_РАБОТ.md
+ПРОЕКТ.md
