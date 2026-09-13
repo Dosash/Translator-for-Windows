@@ -23,7 +23,8 @@ src/Translator/                 WPF app (WinExe, AssemblyName "Translator")
   Assets/                       AppIcon.ico
 src/Translator.Offline/         offline translation engine (net10.0 class library)
 tests/Translator.Tests/         xUnit tests
-tools/                          helper tools (icon generator, …)
+tools/IconGen/                  renders Assets/AppIcon.ico
+tools/OfflineCli/               console harness for the offline engine (status, download, translate, bench)
 installer/                      Inno Setup script
 ```
 
@@ -82,6 +83,24 @@ Translation flow (`TranslatorModel.Translate`):
 5. Errors as on macOS (offline-only without models, no internet, generic failure).
 
 Auto-translate: 700 ms debounce after typing. History keeps the last 10 entries.
+
+## Offline catalog
+
+One language = a model to English and a model from English (`Catalog/OfflineModelCatalog.cs`).
+Files: `onnx/encoder_model_quantized.onnx`, `onnx/decoder_model_merged_quantized.onnx`, SentencePiece
+models and `vocab.json`; SHA-256 verified against the Hub, resumable downloads, per-model `manifest.json`.
+
+| Language | → en | en → | Notes |
+|---|---|---|---|
+| ru es de fr it uk | `Xenova/opus-mt-xx-en` | `Xenova/opus-mt-en-xx` | |
+| zh-CN | `Xenova/opus-mt-zh-en` | `Xenova/opus-mt-en-zh` | target token `>>cmn_Hans<<` |
+| pt | `Xenova/opus-mt-ROMANCE-en` | `Xenova/opus-mt-en-ROMANCE` | target token `>>pt_BR<<` |
+| ja | `Xenova/opus-mt-ja-en` | `Xenova/opus-mt-en-mul` | `>>jpn<<`, basic quality |
+| tr | `Xenova/opus-mt-tr-en` | `Xenova/opus-mt-en-mul` | `>>tur<<`, basic quality |
+| ko | `Xenova/opus-mt-ko-en` | `noticemkjung/opus-mt-tc-big-en-ko-ONNX` | tokenizer files from `Helsinki-NLP/opus-mt-tc-big-en-ko`; ≈430 MB |
+
+Greedy decoding with KV cache; long input is split into sentences (≤160 source tokens per call).
+Up to 3 models stay loaded (≈400 MB each) and are released after 10 idle minutes.
 
 ## CLI
 
