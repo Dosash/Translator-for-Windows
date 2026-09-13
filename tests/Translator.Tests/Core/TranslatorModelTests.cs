@@ -224,8 +224,10 @@ public class TranslatorModelTests : IDisposable
     [Fact]
     public async Task SmartPair_TargetAlreadyEnglish_RetargetsToUiLanguage()
     {
-        L10n.Selected = AppUILanguage.Ru;
         var (model, _, _, online, _, _, _) = Build(source: "auto", target: "en");
+        // Set after Build: loading settings applies the stored UI language (System), which on an
+        // English machine would make the counterpart English too.
+        L10n.Selected = AppUILanguage.Ru;
         var call = 0;
         online.Handler = (_, _, _) =>
         {
