@@ -15,6 +15,12 @@ public static class SelectionGrabber
     public static async Task<string?> GrabSelectedTextAsync(CancellationToken ct = default)
     {
         var snapshot = ClipboardService.Capture();
+        if (!snapshot.Succeeded)
+        {
+            // Another app briefly holds the clipboard: try once more, so the user's content can be put back.
+            await Task.Delay(100, ct).ConfigureAwait(false);
+            snapshot = ClipboardService.Capture();
+        }
         var previousSequence = ClipboardService.SequenceNumber;
 
         await InputSimulator.WaitForModifiersReleasedAsync(ct).ConfigureAwait(false);
@@ -40,7 +46,14 @@ public static class SelectionGrabber
 
         var text = ClipboardService.GetText();
         DebugLog.Write($"SelectionGrabber: text length={text?.Length ?? -1}");
-        ClipboardService.Restore(snapshot);
+        if (snapshot.Succeeded)
+        {
+            ClipboardService.Restore(snapshot);
+        }
+        else
+        {
+            DebugLog.Write("SelectionGrabber: previous clipboard wasn't captured, leaving the copied selection");
+        }
         return text;
     }
 }

@@ -84,6 +84,67 @@ public class ClipboardServiceTests
     }
 
     [Fact]
+    public void Capture_reports_failure_while_another_app_holds_the_clipboard()
+    {
+        using (new ClipboardHold())
+        {
+            var snapshot = ClipboardService.Capture();
+
+            Assert.False(snapshot.Succeeded);
+            Assert.Empty(snapshot.Entries);
+        }
+        Assert.True(ClipboardService.Capture().Succeeded);
+    }
+
+    [Fact]
+    public void Restoring_a_failed_capture_leaves_the_clipboard_alone()
+    {
+        var original = ClipboardService.Capture();
+        try
+        {
+            Assert.True(ClipboardService.SetText("keep me", excludeFromHistory: true));
+
+            ClipboardService.Restore(ClipboardSnapshot.Failed);
+
+            Assert.Equal("keep me", ClipboardService.GetText());
+        }
+        finally
+        {
+            ClipboardService.Restore(original);
+        }
+    }
+
+    [Fact]
+    public void An_empty_clipboard_is_a_successful_capture()
+    {
+        Assert.True(new ClipboardSnapshot([]).Succeeded);
+        Assert.False(ClipboardSnapshot.Failed.Succeeded);
+    }
+
+    [Fact]
+    public void Restore_marks_the_restored_data_as_excluded_from_clipboard_history()
+    {
+        var original = ClipboardService.Capture();
+        try
+        {
+            // A snapshot without the history formats, so only Restore itself can add them.
+            var userItem = new ClipboardSnapshot([new ClipboardSnapshotEntry(13 /* CF_UNICODETEXT */, System.Text.Encoding.Unicode.GetBytes("user item\0"))]);
+
+            ClipboardService.Restore(userItem);
+
+            var historyFormat = NativeMethods.RegisterClipboardFormatW(ClipboardService.CanIncludeInHistoryFormat);
+            var marker = ClipboardService.Capture().Entries.FirstOrDefault(e => e.Format == historyFormat);
+            Assert.NotNull(marker.Data);
+            Assert.Equal(0, BitConverter.ToInt32(marker.Data, 0));
+            Assert.Equal("user item", ClipboardService.GetText());
+        }
+        finally
+        {
+            ClipboardService.Restore(original);
+        }
+    }
+
+    [Fact]
     public void SetText_with_excludeFromHistory_still_round_trips_the_text()
     {
         var original = ClipboardService.Capture();

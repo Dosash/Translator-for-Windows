@@ -8,10 +8,16 @@ namespace Translator.Platform;
 /// </summary>
 public static class TextInserter
 {
-    public static async Task PasteAsync(string text, IntPtr targetWindow, CancellationToken ct = default)
+    /// <returns>False when the text couldn't be put on the clipboard; nothing is pasted in that case.</returns>
+    public static async Task<bool> PasteAsync(string text, IntPtr targetWindow, CancellationToken ct = default)
     {
         var snapshot = ClipboardService.Capture();
-        ClipboardService.SetText(text, excludeFromHistory: true);
+        if (!ClipboardService.SetText(text, excludeFromHistory: true))
+        {
+            // Ctrl+V now would paste the old clipboard content over the user's selection.
+            DebugLog.Write("TextInserter: clipboard busy, paste skipped");
+            return false;
+        }
 
         if (targetWindow != IntPtr.Zero)
         {
@@ -27,6 +33,14 @@ public static class TextInserter
 
         // Give the target app time to read the clipboard before we put the old content back.
         await Task.Delay(400, ct).ConfigureAwait(false);
-        ClipboardService.Restore(snapshot);
+        if (snapshot.Succeeded)
+        {
+            ClipboardService.Restore(snapshot);
+        }
+        else
+        {
+            DebugLog.Write("TextInserter: previous clipboard wasn't captured, not restoring");
+        }
+        return true;
     }
 }

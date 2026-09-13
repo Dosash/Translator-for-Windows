@@ -13,6 +13,9 @@ public static class ClipboardService
     private const int RetryDelayMs = 30;
     private const long MaxSnapshotBytes = 64 * 1024 * 1024;
 
+    internal const string ExcludeFromMonitoringFormat = "ExcludeClipboardContentFromMonitorProcessing";
+    internal const string CanIncludeInHistoryFormat = "CanIncludeInClipboardHistory";
+
     /// <summary>GDI-handle formats can't be copied as plain bytes; skip them in snapshots.</summary>
     private static readonly uint[] SkippedGdiFormats =
     [
@@ -79,10 +82,7 @@ public static class ClipboardService
             }
             if (excludeFromHistory)
             {
-                var excludeFormat = NativeMethods.RegisterClipboardFormatW("ExcludeClipboardContentFromMonitorProcessing");
-                var historyFormat = NativeMethods.RegisterClipboardFormatW("CanIncludeInClipboardHistory");
-                TrySetGlobalDword(excludeFormat, 0);
-                TrySetGlobalDword(historyFormat, 0);
+                MarkExcludedFromHistory();
             }
             return true;
         }
@@ -102,7 +102,7 @@ public static class ClipboardService
         if (!TryOpenClipboard())
         {
             DebugLog.Write("ClipboardService.Capture: clipboard busy");
-            return new ClipboardSnapshot(entries);
+            return ClipboardSnapshot.Failed;
         }
         try
         {
@@ -151,6 +151,12 @@ public static class ClipboardService
     /// <summary>Restores a previously captured snapshot. An empty snapshot restores as an empty clipboard.</summary>
     public static void Restore(ClipboardSnapshot snapshot)
     {
+        if (!snapshot.Succeeded)
+        {
+            // Restoring a capture that never read the clipboard would wipe the user's content.
+            DebugLog.Write("ClipboardService.Restore: skipped a failed capture");
+            return;
+        }
         if (!TryOpenClipboard())
         {
             DebugLog.Write("ClipboardService.Restore: clipboard busy");
@@ -159,26 +165,12 @@ public static class ClipboardService
         try
         {
             NativeMethods.EmptyClipboard();
-            foreach (var entry in snapshot.Entries)
+            RestoreEntries(snapshot);
+            // The user's item already sits in Win+V history from when they copied it; restoring it after a
+            // selection grab or paste must not add a duplicate (or sync it to the cloud again).
+            if (snapshot.Entries.Count > 0)
             {
-                var hGlobal = NativeMethods.GlobalAlloc(NativeMethods.GMEM_MOVEABLE, (nuint)entry.Data.Length);
-                if (hGlobal == IntPtr.Zero)
-                {
-                    continue;
-                }
-                var ptr = NativeMethods.GlobalLock(hGlobal);
-                if (ptr == IntPtr.Zero)
-                {
-                    NativeMethods.GlobalFree(hGlobal);
-                    continue;
-                }
-                Marshal.Copy(entry.Data, 0, ptr, entry.Data.Length);
-                NativeMethods.GlobalUnlock(hGlobal);
-                if (NativeMethods.SetClipboardData(entry.Format, hGlobal) == IntPtr.Zero)
-                {
-                    // Ownership transfers to the system only on success; free it ourselves otherwise.
-                    NativeMethods.GlobalFree(hGlobal);
-                }
+                MarkExcludedFromHistory();
             }
         }
         finally
@@ -187,11 +179,49 @@ public static class ClipboardService
         }
     }
 
+    /// <summary>Formats that make Win+V clipboard history and cloud sync skip the data. The clipboard must be open.</summary>
+    private static void MarkExcludedFromHistory()
+    {
+        TrySetGlobalDword(NativeMethods.RegisterClipboardFormatW(ExcludeFromMonitoringFormat), 0);
+        TrySetGlobalDword(NativeMethods.RegisterClipboardFormatW(CanIncludeInHistoryFormat), 0);
+    }
+
+    private static void RestoreEntries(ClipboardSnapshot snapshot)
+    {
+        foreach (var entry in snapshot.Entries)
+        {
+            var hGlobal = NativeMethods.GlobalAlloc(NativeMethods.GMEM_MOVEABLE, (nuint)entry.Data.Length);
+            if (hGlobal == IntPtr.Zero)
+            {
+                continue;
+            }
+            var ptr = NativeMethods.GlobalLock(hGlobal);
+            if (ptr == IntPtr.Zero)
+            {
+                NativeMethods.GlobalFree(hGlobal);
+                continue;
+            }
+            Marshal.Copy(entry.Data, 0, ptr, entry.Data.Length);
+            NativeMethods.GlobalUnlock(hGlobal);
+            if (NativeMethods.SetClipboardData(entry.Format, hGlobal) == IntPtr.Zero)
+            {
+                // Ownership transfers to the system only on success; free it ourselves otherwise.
+                NativeMethods.GlobalFree(hGlobal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Test seam for a busy clipboard: a test can't simply hold the real one, because an open without a
+    /// window handle doesn't block other openers.
+    /// </summary>
+    internal static Func<IntPtr, bool> OpenClipboardFunc { get; set; } = NativeMethods.OpenClipboard;
+
     private static bool TryOpenClipboard()
     {
         for (var i = 0; i < MaxRetries; i++)
         {
-            if (NativeMethods.OpenClipboard(IntPtr.Zero))
+            if (OpenClipboardFunc(IntPtr.Zero))
             {
                 return true;
             }
@@ -258,4 +288,11 @@ public static class ClipboardService
 public readonly record struct ClipboardSnapshotEntry(uint Format, byte[] Data);
 
 /// <summary>A copy of every HGLOBAL-backed clipboard format, restorable with <see cref="ClipboardService.Restore"/>.</summary>
-public sealed record ClipboardSnapshot(IReadOnlyList<ClipboardSnapshotEntry> Entries);
+public sealed record ClipboardSnapshot(IReadOnlyList<ClipboardSnapshotEntry> Entries)
+{
+    /// <summary>A capture that couldn't open the clipboard (another app held it) — distinct from an empty clipboard.</summary>
+    public static ClipboardSnapshot Failed { get; } = new([]) { Succeeded = false };
+
+    /// <summary>False when the clipboard couldn't be read; such a snapshot is never restored.</summary>
+    public bool Succeeded { get; init; } = true;
+}
