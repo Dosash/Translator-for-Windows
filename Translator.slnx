@@ -6,4 +6,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Translator.Tests/Translator.Tests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/OfflineCli/OfflineCli.csproj" />
+  </Folder>
 </Solution>
