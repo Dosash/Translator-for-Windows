@@ -1,0 +1,170 @@
+<w:FloatingWindow x:Class="Translator.UI.Windows.PanelWindow"
+                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                  xmlns:ui="clr-namespace:Translator.UI"
+                  xmlns:c="clr-namespace:Translator.UI.Controls"
+                  xmlns:w="clr-namespace:Translator.UI.Windows"
+                  Title="{ui:Loc app.title}"
+                  Width="400">
+    <StackPanel Margin="16">
+        <!-- Header -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <c:LogoMark Size="34" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource TitleText}" Text="{ui:Loc app.title}" />
+                <TextBlock Style="{StaticResource SubtitleText}" Text="{ui:Loc app.subtitle}" />
+            </StackPanel>
+            <Border Grid.Column="2" Style="{StaticResource Capsule}" Margin="10,0,0,0"
+                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                    ToolTip="{Binding EnginePrivacyText}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource IconText}" Margin="0,0,5,0" FontSize="10.5"
+                               Foreground="{DynamicResource SageBrush}"
+                               Text="{Binding Engine, Converter={StaticResource EngineGlyph}}" />
+                    <TextBlock VerticalAlignment="Center" FontSize="10.5" FontWeight="Medium" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource SageBrush}" Text="{Binding EnginePrivacyText}" />
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- Language pair -->
+        <Grid Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <c:LanguagePicker ItemsSource="{Binding SourceOptions}" SelectedCode="{Binding SourceCode}" />
+            <Button Grid.Column="1" Margin="8,0" Style="{StaticResource IconCircleButton24}"
+                    Content="{x:Static ui:Icons.Swap}" Click="OnSwapClick"
+                    ToolTip="{ui:Loc swap.languages}" AutomationProperties.Name="{ui:Loc swap.languages}" />
+            <c:LanguagePicker Grid.Column="2" ItemsSource="{Binding TargetOptions}" SelectedCode="{Binding TargetCode}" />
+        </Grid>
+
+        <!-- Input -->
+        <Grid Margin="0,12,0,0">
+            <TextBox x:Name="InputBox" Style="{StaticResource CardTextBox}" Height="84"
+                     Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                     AutomationProperties.Name="{Binding InputPlaceholder}" />
+            <TextBlock Margin="11,8,11,0" IsHitTestVisible="False" TextWrapping="Wrap" FontSize="12.5"
+                       Foreground="{DynamicResource InkFaintBrush}" Text="{Binding InputPlaceholder}"
+                       Visibility="{Binding InputText, Converter={StaticResource CollapsedWhen}}" />
+        </Grid>
+        <TextBlock Margin="0,3,2,0" HorizontalAlignment="Right" FontSize="10.5" Text="{Binding CharCounterText}">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="{DynamicResource InkFaintBrush}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsNearLimit}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource InkNearBrush}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsOverLimit}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource RoseInkBrush}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <!-- Actions -->
+        <DockPanel Margin="0,8,0,0" LastChildFill="False">
+            <Button DockPanel.Dock="Left" Style="{StaticResource PillButton}" Content="{ui:Loc translate}"
+                    Click="OnTranslateClick" ToolTip="Ctrl+Enter" />
+            <c:Spinner DockPanel.Dock="Left" Margin="10,0,0,0"
+                       Visibility="{Binding IsTranslating, Converter={StaticResource VisibleWhen}}" />
+            <Button DockPanel.Dock="Right" Margin="10,0,0,0" Style="{StaticResource IconCircleButton26}"
+                    Background="{DynamicResource RoseBrush}" Content="{x:Static ui:Icons.Close}" Click="OnClearClick"
+                    ToolTip="{ui:Loc clear}" AutomationProperties.Name="{ui:Loc clear}" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource IconCircleButton26}"
+                    Background="{DynamicResource SkyBrush}" Content="{x:Static ui:Icons.Speaker}" Click="OnSpeakInputClick"
+                    IsEnabled="{Binding InputText, Converter={StaticResource Truthy}}"
+                    ToolTip="{ui:Loc speak.source}" AutomationProperties.Name="{ui:Loc speak.source}" />
+        </DockPanel>
+
+        <!-- Result -->
+        <Border Margin="0,12,0,0" Style="{StaticResource Card}" Padding="10">
+            <StackPanel>
+                <Grid>
+                    <TextBox x:Name="ResultBox" Style="{StaticResource ReadOnlyTextBox}" Height="84"
+                             VerticalScrollBarVisibility="Auto" Text="{Binding OutputText, Mode=OneWay}"
+                             AutomationProperties.Name="{ui:Loc result.placeholder}" />
+                    <TextBlock Margin="2,0,0,0" IsHitTestVisible="False" FontSize="13.5" TextWrapping="Wrap"
+                               Foreground="{DynamicResource InkFaintBrush}" Text="{ui:Loc result.placeholder}"
+                               Visibility="{Binding OutputText, Converter={StaticResource CollapsedWhen}}" />
+                </Grid>
+                <StackPanel Margin="0,8,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource IconCircleButton}" Background="{DynamicResource SkyBrush}"
+                            Content="{x:Static ui:Icons.Speaker}" Click="OnSpeakOutputClick"
+                            IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}"
+                            ToolTip="{ui:Loc speak.translation}" AutomationProperties.Name="{ui:Loc speak.translation}" />
+                    <Button x:Name="CopyButton" Margin="8,0,0,0" Style="{StaticResource IconCircleButton}"
+                            Content="{x:Static ui:Icons.Copy}" Click="OnCopyClick"
+                            IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}"
+                            ToolTip="{ui:Loc copy.translation}" AutomationProperties.Name="{ui:Loc copy.translation}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Notice / error / offline updates -->
+        <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" FontSize="11.5" Foreground="{DynamicResource SageBrush}"
+                   Text="{Binding Notice}" Visibility="{Binding Notice, Converter={StaticResource VisibleWhen}}" />
+        <Border Margin="0,12,0,0" Style="{StaticResource ErrorBox}"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource VisibleWhen}}">
+            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource RoseInkBrush}" Text="{Binding ErrorMessage}" />
+        </Border>
+        <Border Margin="0,12,0,0" Style="{StaticResource Card}" CornerRadius="10" Padding="10"
+                Visibility="{Binding OfflineUpdateMessage, Converter={StaticResource VisibleWhen}}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Margin="0,0,8,0" Style="{StaticResource IconText}"
+                           Foreground="{DynamicResource SageBrush}" Text="{x:Static ui:Icons.Sync}" />
+                <Button DockPanel.Dock="Right" Margin="10,0,0,0" Style="{StaticResource LinkButton}" FontSize="11.5"
+                        Foreground="{DynamicResource InkSubtleBrush}" Content="{ui:Loc later}" Click="OnLaterClick" />
+                <Button DockPanel.Dock="Right" Margin="10,0,0,0" Style="{StaticResource LinkButton}" FontSize="11.5"
+                        Content="{ui:Loc offline.languages}" Click="OnOfflineLanguagesClick" />
+                <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="32"
+                           FontSize="11" Foreground="{DynamicResource InkStrongBrush}" Text="{Binding OfflineUpdateMessage}" />
+            </DockPanel>
+        </Border>
+
+        <!-- Footer -->
+        <Grid Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Ellipse Width="7" Height="7" VerticalAlignment="Center">
+                <Ellipse.Style>
+                    <Style TargetType="Ellipse">
+                        <Setter Property="Fill" Value="{DynamicResource RoseBrush}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding OfflineReady}" Value="True">
+                                <Setter Property="Fill" Value="{DynamicResource SageBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Ellipse.Style>
+            </Ellipse>
+            <TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="11"
+                       TextTrimming="CharacterEllipsis" Foreground="{DynamicResource InkMutedBrush}"
+                       Text="{Binding OfflineStatusText}" ToolTip="{Binding OfflineStatusText}" />
+            <Button Grid.Column="2" Margin="8,0,6,0" Style="{StaticResource LinkButton}" FontSize="11.5"
+                    Content="{ui:Loc offline.languages}" Click="OnOfflineLanguagesClick" />
+            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                <Button Style="{StaticResource GhostIconButton}" Content="{x:Static ui:Icons.History}" Click="OnHistoryClick"
+                        ToolTip="{ui:Loc history}" AutomationProperties.Name="{ui:Loc history}" />
+                <Button Style="{StaticResource GhostIconButton}" Content="{x:Static ui:Icons.Settings}" Click="OnSettingsClick"
+                        ToolTip="{ui:Loc settings}" AutomationProperties.Name="{ui:Loc settings}" />
+                <Button Style="{StaticResource GhostIconButton}" Content="{x:Static ui:Icons.Power}" FontSize="11" Click="OnQuitClick"
+                        ToolTip="{ui:Loc quit}" AutomationProperties.Name="{ui:Loc quit}" />
+            </StackPanel>
+        </Grid>
+    </StackPanel>
+</w:FloatingWindow>
