@@ -39,6 +39,7 @@ public sealed class AppController : IDisposable
     private FirstRunWindow? _firstRunWindow;
     private OfflineLanguagesWindow? _offlineWindow;
     private IntPtr _selectionSourceWindow;
+    private PixelRect _bubbleAnchor;
     private bool _selectionInProgress;
     private bool _disposed;
 
@@ -231,6 +232,7 @@ public sealed class AppController : IDisposable
 
     private void ShowBubble(PixelRect anchor)
     {
+        _bubbleAnchor = anchor;
         _bubble?.ShowPlaced(size =>
         {
             var scale = ScreenInfo.GetScale(anchor);
@@ -282,7 +284,8 @@ public sealed class AppController : IDisposable
             }
             catch (Exception ex)
             {
-                DebugLog.Write($"Selection: grab failed ({ex.GetType().Name})");
+                // Shown to the user as "nothing selected", so keep the real cause in the log.
+                DebugLog.Write($"Selection: grab failed ({ex.GetType().Name}){Environment.NewLine}{ex.StackTrace}");
                 selected = null;
             }
 
@@ -326,13 +329,21 @@ public sealed class AppController : IDisposable
             return;
         }
         _bubble.HideWindow();
+        bool pasted;
         try
         {
-            await TextInserter.PasteAsync(translation, _selectionSourceWindow);
+            pasted = await TextInserter.PasteAsync(translation, _selectionSourceWindow);
         }
         catch (Exception ex)
         {
-            DebugLog.Write($"Replace: paste failed ({ex.GetType().Name})");
+            DebugLog.Write($"Replace: paste failed ({ex.GetType().Name}){Environment.NewLine}{ex.StackTrace}");
+            pasted = false;
+        }
+        if (!pasted && !_disposed)
+        {
+            // Bring the bubble back with the reason; the translation stays there to copy or retry.
+            _model.ShowError(L10n.T("error.replace.failed"));
+            ShowBubble(_bubbleAnchor);
         }
     }
 
