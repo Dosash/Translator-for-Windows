@@ -6,7 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Translator.Tests" />
+    <InternalsVisibleTo Include="OfflineCli" />
   </ItemGroup>
 
 </Project>
