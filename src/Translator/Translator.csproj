@@ -10,6 +10,12 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon Condition="Exists('Assets\AppIcon.ico')">Assets\AppIcon.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Publishing (see build.ps1): self-contained, folder deployment for both supported RIDs.
+         Self-contained / single-file / R2R are chosen by build.ps1 via `dotnet publish` flags,
+         not here, so a plain `dotnet build` (used by IDEs / other agents' inner loop) is
+         unaffected. -->
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>

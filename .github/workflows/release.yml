@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.2.0 (no leading v)"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build, package and release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $v = "${{ inputs.version }}".TrimStart("v")
+          }
+          else {
+            $v = "${{ github.ref_name }}".TrimStart("v")
+          }
+          if ([string]::IsNullOrWhiteSpace($v)) {
+            throw "Could not resolve a version from the trigger."
+          }
+          Write-Host "Resolved version: $v"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$v"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=v$v"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Ensure Inno Setup is available
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
+            Write-Host "ISCC.exe not found on PATH, installing Inno Setup via Chocolatey..."
+            choco install innosetup -y --no-progress
+          }
+          $innoDir = "${env:ProgramFiles(x86)}\Inno Setup 6"
+          if ((Test-Path $innoDir) -and ($env:PATH -notlike "*$innoDir*")) {
+            Add-Content -Path $env:GITHUB_PATH -Value $innoDir
+          }
+
+      - name: Build, test, package (win-x64 + win-arm64, portable zips + installers)
+        shell: pwsh
+        run: ./build.ps1 -Runtime all -Version "${{ steps.version.outputs.version }}"
+
+      - name: List dist
+        shell: pwsh
+        run: Get-ChildItem dist -File | ForEach-Object { "{0,10:N1} MB  {1}" -f ($_.Length / 1MB), $_.Name }
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          NOTES="## Translator ${TAG_NAME}
+
+          Windows build of Translator — a free tray translator with online (Google) and offline \
+          (Opus-MT / ONNX Runtime) translation for 12 languages.
+
+          Builds are unsigned. On first launch Windows SmartScreen may show \
+          \"Windows protected your PC\" — click \"More info\" then \"Run anyway\".
+
+          ---
+
+          Сборка Translator для Windows — бесплатный переводчик в трее с онлайн- (Google) и \
+          офлайн- (Opus-MT / ONNX Runtime) переводом для 12 языков.
+
+          Сборки не подписаны. При первом запуске Windows SmartScreen может показать \
+          «Windows защитила ваш компьютер» — нажмите «Подробнее», затем «Выполнить в любом случае».
+
+          Проверить целостность файлов можно по \`SHA256SUMS.txt\`."
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" dist/*.zip dist/*.exe dist/SHA256SUMS.txt --clobber
+          else
+            gh release create "$TAG_NAME" \
+              dist/*.zip dist/*.exe dist/SHA256SUMS.txt \
+              --title "Translator ${TAG_NAME}" \
+              --notes "$NOTES" \
+              --target "${{ github.sha }}"
+          fi

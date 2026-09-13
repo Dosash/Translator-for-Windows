@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, test, publish (win-x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Build, test, publish, package
+        shell: pwsh
+        run: ./build.ps1 -Runtime win-x64
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@v7
+        with:
+          name: translator-win-x64-portable
+          path: dist/Translator-*-win-x64-portable.zip
+          if-no-files-found: error
