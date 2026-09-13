@@ -258,6 +258,10 @@ public sealed class TranslatorModel : ObservableObject
 
     public void Translate()
     {
+        // An explicit translation supersedes a pending auto-translate debounce, which would otherwise
+        // translate the same text again (and add a duplicate history entry).
+        _autoTranslateCts?.Cancel();
+
         var text = _inputText.Trim();
         if (text.Length == 0)
         {
