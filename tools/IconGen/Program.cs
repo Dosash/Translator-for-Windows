@@ -81,30 +81,42 @@ internal static class Program
     // ---- Drawing -----------------------------------------------------------------------------
 
     /// <summary>Full design: gradient square, big "A" bubble, small "a" reply bubble.</summary>
+    ///
+    /// <remarks>
+    /// The x/y numbers below are ported verbatim from make_icon.swift's grid, which is an AppKit
+    /// (y-up, origin bottom-left) coordinate system. WPF's DrawingContext is y-down (origin
+    /// top-left), so every y and every rect's top edge is converted with <see cref="FlipY"/> /
+    /// <see cref="FlipRectTop"/> — otherwise the whole layout renders vertically mirrored (big
+    /// bubble bottom-right instead of top-left, tails pointing the wrong way) while the glyphs
+    /// stay upright and so look "fine" in isolation, which is what made the original bug easy to
+    /// miss. Only y changes; x is identical to the Swift source.
+    /// </remarks>
     private static void DrawFull(DrawingContext dc, double canvas)
     {
         double s = canvas / 1024.0;
 
         DrawBackground(dc, canvas, s);
 
-        // Big light bubble with tail, "A".
-        var bigBubble = RoundedRect(225 * s, 460 * s, 400 * s, 270 * s, 90 * s);
+        // Big light bubble with tail, "A" — upper-left, tail pointing down-left.
+        var bigBubble = RoundedRect(225 * s, FlipRectTop(460 * s, 270 * s, canvas), 400 * s, 270 * s, 90 * s);
         dc.DrawGeometry(new SolidColorBrush(Mist), null, bigBubble);
         dc.DrawGeometry(new SolidColorBrush(Mist), null, Tail(
-            (305 * s, 470 * s), (258 * s, 352 * s), (405 * s, 462 * s)));
-        DrawGlyph(dc, "A", 425 * s, 600 * s, 190 * s, SageDeep, FontWeights.Bold);
+            (305 * s, FlipY(470 * s, canvas)), (258 * s, FlipY(352 * s, canvas)), (405 * s, FlipY(462 * s, canvas))));
+        DrawGlyph(dc, "A", 425 * s, FlipY(600 * s, canvas), 190 * s, SageDeep, FontWeights.Bold);
 
-        // Small pink reply bubble with tail, "a".
-        var smallBubble = RoundedRect(565 * s, 295 * s, 250 * s, 190 * s, 64 * s);
+        // Small pink reply bubble with tail, "a" — lower-right, tail pointing up toward the big bubble.
+        var smallBubble = RoundedRect(565 * s, FlipRectTop(295 * s, 190 * s, canvas), 250 * s, 190 * s, 64 * s);
         dc.DrawGeometry(new SolidColorBrush(Rose), null, smallBubble);
         dc.DrawGeometry(new SolidColorBrush(Rose), null, Tail(
-            (700 * s, 476 * s), (742 * s, 540 * s), (628 * s, 480 * s)));
-        DrawGlyph(dc, "a", 690 * s, 385 * s, 145 * s, Ink, FontWeights.Bold);
+            (700 * s, FlipY(476 * s, canvas)), (742 * s, FlipY(540 * s, canvas)), (628 * s, FlipY(480 * s, canvas))));
+        DrawGlyph(dc, "a", 690 * s, FlipY(390 * s, canvas), 145 * s, Ink, FontWeights.Bold);
     }
 
     /// <summary>
     /// Simplified mark for 16/20/24/32 px: a single bold bubble with "A" — no tail, no second
-    /// bubble, thicker strokes and a bigger glyph so it reads at tray-icon size.
+    /// bubble, thicker strokes and a bigger glyph so it reads at tray-icon size. This is an
+    /// original, centered/symmetric composition (not ported from make_icon.swift), authored
+    /// directly in WPF's y-down grid, so it has no up/down orientation to get wrong.
     /// </summary>
     private static void DrawSimplified(DrawingContext dc, double canvas)
     {
@@ -147,6 +159,12 @@ internal static class Program
         var origin = new Point(centerX - formatted.Width / 2, centerY - formatted.Height / 2);
         dc.DrawText(formatted, origin);
     }
+
+    /// <summary>Converts a y-up (AppKit) point coordinate to y-down (WPF) for the given canvas size.</summary>
+    private static double FlipY(double yUp, double canvas) => canvas - yUp;
+
+    /// <summary>Converts a y-up (AppKit) rect's bottom edge + height to a y-down (WPF) top edge.</summary>
+    private static double FlipRectTop(double yUpBottom, double height, double canvas) => canvas - yUpBottom - height;
 
     private static Geometry RoundedRect(double x, double y, double w, double h, double r)
     {
