@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.RegularExpressions;
 using System.Windows;
 using Translator.Core;
 using Translator.Offline;
@@ -12,6 +13,7 @@ public partial class OfflineLanguagesWindow : AuxWindow
     private readonly SettingsStore _settings;
     private readonly OfflineModelManager _manager;
     private readonly List<OfflineLanguageRow> _rows;
+    private readonly CancellationTokenSource _closing = new();
     private OfflineLanguageRow? _busyRow;
     private CancellationTokenSource? _downloadCts;
 
@@ -34,9 +36,24 @@ public partial class OfflineLanguagesWindow : AuxWindow
         {
             manager.StateChanged -= OnManagerStateChanged;
             model.PropertyChanged -= OnModelPropertyChanged;
+            _closing.Cancel();
             _downloadCts?.Cancel();
         };
-        Loaded += async (_, _) => await RefreshModelStatusAsync();
+        Loaded += async (_, _) =>
+        {
+            await RefreshModelStatusAsync();
+            await RefreshDownloadSizesAsync();
+        };
+    }
+
+    /// <summary>
+    /// The engine prefixes download errors with "Couldn't download 'xx': "; the localized
+    /// "offline.download.failed" text already says that, so keep only the reason.
+    /// </summary>
+    internal static string DescribeFailure(string message)
+    {
+        var prefix = Regex.Match(message, @"^Couldn't download '[^']*':\s*");
+        return (prefix.Success ? message[prefix.Length..] : message).Trim().TrimEnd('.');
     }
 
     protected override void OnLanguageChanged()
@@ -85,6 +102,24 @@ public partial class OfflineLanguagesWindow : AuxWindow
         }
     }
 
+    /// <summary>Replaces the catalog estimates with exact sizes from the model hub; failures keep the estimates.</summary>
+    private async Task RefreshDownloadSizesAsync()
+    {
+        try
+        {
+            await _manager.RefreshDownloadSizesAsync(_closing.Token);
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write($"OfflineLanguagesWindow: size refresh failed ({ex.GetType().Name})");
+            return;
+        }
+        if (!_closing.IsCancellationRequested)
+        {
+            RefreshRows();
+        }
+    }
+
     private void OnManagerStateChanged(object? sender, string code) =>
         // Raised on a background thread.
         Dispatcher.BeginInvoke(() =>
@@ -92,6 +127,7 @@ public partial class OfflineLanguagesWindow : AuxWindow
             if (_rows.FirstOrDefault(r => r.Code == code) is { } row)
             {
                 row.State = SafeGetState(code);
+                row.SizeBytes = SafeGetSize(code);
             }
         });
 
@@ -132,12 +168,14 @@ public partial class OfflineLanguagesWindow : AuxWindow
         }
         catch (OperationCanceledException)
         {
-            // Cancelled by the user or by closing the window.
+            // Cancelled by the user or by closing the window; a later download resumes the partial files.
         }
         catch (Exception ex)
         {
+            // OfflineDownloadException (network, HTTP, corrupted file, disk) or InvalidOperationException
+            // (already downloading); anything unexpected is reported the same way instead of crashing.
             DebugLog.Write($"OfflineLanguagesWindow: download failed ({ex.GetType().Name})");
-            ShowMessage(L10n.Format("offline.download.failed", ex.Message), isError: true);
+            ShowMessage(L10n.Format("offline.download.failed", DescribeFailure(ex.Message)), isError: true);
         }
         finally
         {
@@ -159,13 +197,17 @@ public partial class OfflineLanguagesWindow : AuxWindow
         }
         try
         {
-            await _manager.RemoveAsync(row.Code);
+            await _manager.RemoveAsync(row.Code, _closing.Token);
             ShowMessage(null, isError: false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Window closed while removing.
         }
         catch (Exception ex)
         {
             DebugLog.Write($"OfflineLanguagesWindow: remove failed ({ex.GetType().Name})");
-            ShowMessage(L10n.Format("error.translate.failed", ex.Message), isError: true);
+            ShowMessage(ex.Message, isError: true);
         }
         RefreshRows();
         await AfterInstalledSetChangedAsync();
