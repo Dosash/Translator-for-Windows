@@ -91,16 +91,20 @@ Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
 
 [CustomMessages]
+; Language-specific entries use the "<language>.<name>=" prefix form; unprefixed entries are the fallback.
 LaunchAtStartupTask=Launch at Windows sign-in
-LaunchAtStartupTask.russian=Запускать при входе в Windows
-LaunchAtStartupTask.ukrainian=Запускати під час входу в Windows
+russian.LaunchAtStartupTask=Запускать при входе в Windows
+ukrainian.LaunchAtStartupTask=Запускати під час входу в Windows
+OtherTasks=Other:
+russian.OtherTasks=Прочее:
+ukrainian.OtherTasks=Інше:
 DeleteUserDataPrompt=Also delete Translator's saved settings, translation history and downloaded offline language models?%n%nThis will remove:%n%1%n%2
-DeleteUserDataPrompt.russian=Удалить также настройки, историю переводов и загруженные офлайн-модели Translator?%n%nБудут удалены:%n%1%n%2
-DeleteUserDataPrompt.ukrainian=Видалити також налаштування, історію перекладів і завантажені офлайн-моделі Translator?%n%nБудуть видалені:%n%1%n%2
+russian.DeleteUserDataPrompt=Удалить также настройки, историю переводов и загруженные офлайн-модели Translator?%n%nБудут удалены:%n%1%n%2
+ukrainian.DeleteUserDataPrompt=Видалити також налаштування, історію перекладів і завантажені офлайн-моделі Translator?%n%nБудуть видалені:%n%1%n%2
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "autostart"; Description: "{cm:LaunchAtStartupTask}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "autostart"; Description: "{cm:LaunchAtStartupTask}"; GroupDescription: "{cm:OtherTasks}"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -111,8 +115,8 @@ Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 ; Same launch-at-startup mechanism the app itself uses for Settings -> "Launch at Windows sign-in"
-; (see docs/ARCHITECTURE.md — HKCU Run value "Translator" = "<exe>" --autostart). uninsdeletevalue
-; means the value is always cleaned up on uninstall, whether or not this task was ticked.
+; (see docs/ARCHITECTURE.md — HKCU Run value "Translator" = "<exe>" --autostart). The uninstaller
+; deletes the value in [Code] as well, because the app itself may have created it.
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Translator"; ValueData: """{app}\{#MyAppExeName}"" --autostart"; Flags: uninsdeletevalue; Tasks: autostart
 
@@ -124,7 +128,15 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   AppDataDir, LocalAppDataDir, PromptText: String;
 begin
-  if CurUninstallStep = usPostUninstall then
+  if CurUninstallStep = usUninstall then
+  begin
+    // The app can enable autostart from its own settings, so the value may exist even when the
+    // installer task was not selected.
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Translator');
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run', 'Translator');
+  end;
+
+  if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
   begin
     AppDataDir := ExpandConstant('{userappdata}\Translator');
     LocalAppDataDir := ExpandConstant('{localappdata}\Translator');
