@@ -41,9 +41,18 @@ public sealed class SettingsStore : ObservableObject
     public event EventHandler? HotkeysChanged;
     public event EventHandler<bool>? RecordingStateChanged;
 
+    private readonly Action<bool> _setAutostartEnabled;
+
     public SettingsStore(string path)
+        : this(path, Autostart.IsEnabled, Autostart.SetEnabled)
+    {
+    }
+
+    /// <summary>Tests pass their own autostart delegates so the real HKCU Run key is never touched.</summary>
+    internal SettingsStore(string path, Func<bool> isAutostartEnabled, Action<bool> setAutostartEnabled)
     {
         _path = path;
+        _setAutostartEnabled = setAutostartEnabled;
         var data = TryLoad(path);
         if (data is not null)
         {
@@ -51,7 +60,7 @@ public sealed class SettingsStore : ObservableObject
         }
         try
         {
-            _launchAtLogin = Autostart.IsEnabled();
+            _launchAtLogin = isAutostartEnabled();
         }
         catch
         {
@@ -162,7 +171,7 @@ public sealed class SettingsStore : ObservableObject
             OnPropertyChanged();
             try
             {
-                Autostart.SetEnabled(value);
+                _setAutostartEnabled(value);
                 LoginItemMessage = null;
             }
             catch (Exception ex)

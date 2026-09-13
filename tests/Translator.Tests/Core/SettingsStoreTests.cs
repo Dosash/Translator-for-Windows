@@ -140,9 +140,20 @@ public class SettingsStoreTests : IDisposable
     [Fact]
     public void LaunchAtLoginSetterUpdatesValueViaAutostartStub()
     {
-        var settings = new SettingsStore(_path);
+        var enabled = false;
+        var settings = new SettingsStore(_path, () => enabled, value => enabled = value);
         settings.LaunchAtLogin = true;
         Assert.True(settings.LaunchAtLogin);
+        Assert.True(enabled);
         Assert.Null(settings.LoginItemMessage);
+    }
+
+    [Fact]
+    public void LaunchAtLoginFailureRevertsAndReportsMessage()
+    {
+        var settings = new SettingsStore(_path, () => false, _ => throw new UnauthorizedAccessException("denied"));
+        settings.LaunchAtLogin = true;
+        Assert.False(settings.LaunchAtLogin);
+        Assert.NotNull(settings.LoginItemMessage);
     }
 }
