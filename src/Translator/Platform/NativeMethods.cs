@@ -41,6 +41,7 @@ internal static partial class NativeMethods
     internal const int VK_RWIN = 0x5C;
     internal const int VK_C = 0x43;
     internal const int VK_V = 0x56;
+    internal const int VK_INSERT = 0x2D;
     /// <summary>Unassigned virtual key, injected to break "lone Alt release opens the menu" heuristic.</summary>
     internal const int VK_DUMMY = 0xE8;
 
@@ -280,6 +281,10 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+    /// <summary>Uses a StringBuilder buffer, so this stays a classic DllImport rather than LibraryImport.</summary>
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
     [LibraryImport("user32.dll")]
     internal static partial IntPtr MonitorFromRect(in RECT lprc, uint dwFlags);
 
@@ -399,6 +404,10 @@ internal static partial class NativeMethods
 
     [LibraryImport("kernel32.dll")]
     internal static partial IntPtr OpenProcess(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, uint dwProcessId);
+
+    /// <summary>Uses a StringBuilder buffer, so this stays a classic DllImport rather than LibraryImport.</summary>
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern bool QueryFullProcessImageNameW(IntPtr hProcess, uint dwFlags, System.Text.StringBuilder lpExeName, ref uint lpdwSize);
 
     [LibraryImport("kernel32.dll")]
     internal static partial IntPtr GlobalAlloc(uint uFlags, nuint dwBytes);
