@@ -110,6 +110,24 @@ public class CommandLineTests
         Assert.Contains("firstrun", command.Error);
     }
 
+    [Theory]
+    [InlineData("--translate-screen")]
+    [InlineData("--Translate-Screen")]
+    public void TranslateScreen_flag_needs_no_text(string flag)
+    {
+        var command = CommandLine.Parse([flag]);
+
+        Assert.Equal(CliCommandKind.TranslateScreen, command.Kind);
+        Assert.Null(command.Text);
+    }
+
+    [Fact]
+    public void TranslateScreen_is_not_mistaken_for_translate_with_text()
+    {
+        Assert.Equal(CliCommandKind.TranslateScreen, CommandLine.Parse(["--translate-screen", "ignored"]).Kind);
+        Assert.Equal(CliCommandKind.Translate, CommandLine.Parse(["--translate", "--translate-screen"]).Kind);
+    }
+
     [Fact]
     public void Quit_flag()
     {

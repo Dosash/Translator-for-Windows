@@ -11,6 +11,8 @@ public enum CliCommandKind
     Autostart,
     /// <summary>Open the panel and translate <see cref="CliCommand.Text"/>.</summary>
     Translate,
+    /// <summary>Select a screen area, recognize its text and translate it.</summary>
+    TranslateScreen,
     /// <summary>Open <see cref="CliCommand.Window"/> (starting the app if needed).</summary>
     Open,
     /// <summary>Ask the running instance to exit.</summary>
@@ -43,6 +45,7 @@ public sealed record CliCommand(
 public static class CommandLine
 {
     public const string TranslateFlag = "--translate";
+    public const string TranslateScreenFlag = "--translate-screen";
     public const string OpenFlag = "--open";
     public const string QuitFlag = "--quit";
     public const string TestTranslateFlag = "--test-translate";
@@ -80,6 +83,8 @@ public static class CommandLine
                     return rest.Count >= 1
                         ? new CliCommand(CliCommandKind.Translate, rest[0])
                         : Invalid($"Usage: Translator.exe {TranslateFlag} \"text\"");
+                case TranslateScreenFlag:
+                    return new CliCommand(CliCommandKind.TranslateScreen);
                 case OpenFlag:
                     return rest.Count >= 1 && WindowNames.TryGetValue(rest[0].Trim(), out var window)
                         ? new CliCommand(CliCommandKind.Open, Window: window)

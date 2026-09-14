@@ -13,6 +13,7 @@ public sealed class HotkeyManager : IDisposable
     public const int SelectionId = 1;
     public const int ClipboardId = 2;
     public const int PanelId = 3;
+    public const int ScreenId = 4;
 
     private readonly Dictionary<int, Action> _callbacks = new();
     private HwndSource? _hwndSource;

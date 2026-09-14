@@ -137,6 +137,16 @@
                             <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc hotkey.panel.caption}" />
                         </StackPanel>
                     </DockPanel>
+                    <Border Style="{StaticResource Divider}" Margin="0,12" />
+                    <DockPanel>
+                        <c:HotkeyRecorder DockPanel.Dock="Right" Margin="12,0,0,0" Hotkey="{Binding ScreenHotkey}"
+                                          RecordingChanged="OnRecordingChanged"
+                                          ToolTip="{ui:Loc hotkey.recorder.help}" AutomationProperties.Name="{ui:Loc hotkey.screen}" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource RowTitleText}" Text="{ui:Loc hotkey.screen}" />
+                            <TextBlock Style="{StaticResource CaptionText}" Text="{ui:Loc hotkey.screen.caption}" />
+                        </StackPanel>
+                    </DockPanel>
                     <Border Margin="0,12,0,0" Style="{StaticResource ErrorBox}"
                             Visibility="{Binding HotkeyError, Converter={StaticResource VisibleWhen}}">
                         <TextBlock TextWrapping="Wrap" FontSize="11.5" Foreground="{DynamicResource RoseInkBrush}" Text="{Binding HotkeyError}" />

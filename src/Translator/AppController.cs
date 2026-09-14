@@ -1,11 +1,15 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Translator.Core;
 using Translator.Offline;
 using Translator.Platform;
+using Translator.Platform.Capture;
+using Translator.Platform.Ocr;
 using Translator.UI;
+using Translator.UI.ScreenCapture;
 using Translator.UI.Shell;
 using Translator.UI.Windows;
 
@@ -19,6 +23,9 @@ public sealed class AppController : IDisposable
 {
     private static readonly TimeSpan OfflineCheckTimerInterval = TimeSpan.FromHours(6);
     private static readonly TimeSpan RefocusDelay = TimeSpan.FromMilliseconds(120);
+    /// <summary>Hidden windows (and a closing tray menu) fade out for a moment; the freeze-frame must not catch them.</summary>
+    private static readonly TimeSpan HideBeforeCaptureDelay = TimeSpan.FromMilliseconds(250);
+    private const string LanguageSettingsUri = "ms-settings:regionlanguage";
 
     private readonly Application _app;
     private readonly SettingsStore _settings;
@@ -41,6 +48,8 @@ public sealed class AppController : IDisposable
     private IntPtr _selectionSourceWindow;
     private PixelRect _bubbleAnchor;
     private bool _selectionInProgress;
+    private bool _screenCaptureInProgress;
+    private ScreenAreaSelector? _screenSelector;
     private bool _disposed;
 
     public AppController(Application app)
@@ -86,6 +95,7 @@ public sealed class AppController : IDisposable
         _panel.QuitRequested += (_, _) => Quit();
         _bubble = new BubbleWindow(_model);
         _bubble.ReplaceRequested += (_, _) => _ = ReplaceSelectionAsync();
+        _bubble.LanguageSettingsRequested += (_, _) => OpenLanguageSettings();
         _bubble.ExpandRequested += (_, _) =>
         {
             _bubble.HideWindow();
@@ -134,6 +144,7 @@ public sealed class AppController : IDisposable
         DebugLog.Write("AppController: shutting down");
 
         _offlineCheckTimer?.Stop();
+        _screenSelector?.Cancel();
         L10n.LanguageChanged -= OnLanguageChanged;
         _settings.PropertyChanged -= OnSettingsPropertyChanged;
         _settings.HotkeysChanged -= OnHotkeysChanged;
@@ -167,6 +178,9 @@ public sealed class AppController : IDisposable
                     _model.InputText = text;
                     _model.Translate();
                 }
+                break;
+            case CliCommandKind.TranslateScreen:
+                _ = TranslateScreenAreaAsync();
                 break;
             case CliCommandKind.Normal when fromAnotherInstance:
                 ShowPanel(PanelAnchor.Cursor);
@@ -279,7 +293,7 @@ public sealed class AppController : IDisposable
     /// <summary>Port of macOS translateSelection: grab the selection with Ctrl+C and show the bubble next to it.</summary>
     private async Task TranslateSelectionAsync(IntPtr? sourceWindow = null)
     {
-        if (_selectionInProgress || _panel is null || _bubble is null || _disposed)
+        if (_selectionInProgress || _screenCaptureInProgress || _panel is null || _bubble is null || _disposed)
         {
             return;
         }
@@ -294,6 +308,7 @@ public sealed class AppController : IDisposable
                 DebugLog.Write("Selection: foreground window is elevated");
                 var mouseAnchor = SelectionLocator.GetMouseRect();
                 _panel.HideWindow();
+                _bubble.Configure(BubbleSource.Selection);
                 _model.PrepareForSelection();
                 _model.ShowError(L10n.T("hotkey.admin.note"));
                 ShowBubble(mouseAnchor);
@@ -314,6 +329,7 @@ public sealed class AppController : IDisposable
 
             var anchor = SelectionLocator.GetAnchor();
             _panel.HideWindow();
+            _bubble.Configure(BubbleSource.Selection);
             _model.PrepareForSelection();
             if (string.IsNullOrEmpty(selected))
             {
@@ -370,6 +386,135 @@ public sealed class AppController : IDisposable
         }
     }
 
+    /// <summary>
+    /// Freeze-frames every monitor, lets the user drag a rectangle, recognizes its text with Windows OCR on this PC
+    /// and shows the translation in the bubble next to the rectangle.
+    /// </summary>
+    private async Task TranslateScreenAreaAsync(bool fromTrayMenu = false)
+    {
+        if (_screenCaptureInProgress || _selectionInProgress || _panel is null || _bubble is null || _disposed)
+        {
+            return;
+        }
+        _screenCaptureInProgress = true;
+        try
+        {
+            var ownWindowsVisible = _panel.IsVisible || _bubble.IsVisible;
+            _panel.HideWindow();
+            _bubble.HideWindow();
+            if (ownWindowsVisible || fromTrayMenu)
+            {
+                await Task.Delay(HideBeforeCaptureDelay);
+            }
+            if (_disposed || await SelectScreenAreaAsync() is not { } selected)
+            {
+                return;
+            }
+
+            OcrOutcome outcome;
+            try
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+                _model.PrepareForSelection();
+                _bubble.Configure(BubbleSource.Screen);
+                _bubble.SetRecognizing(true);
+                ShowBubble(selected.Rect);
+                var source = _model.SourceCode;
+                outcome = await Task.Run(() => ScreenTextRecognizer.RecognizeAsync(selected.Image, source));
+            }
+            finally
+            {
+                selected.Image.Clear();
+            }
+
+            if (_disposed)
+            {
+                return;
+            }
+            if (!_bubble.IsVisible)
+            {
+                // Dismissed (Esc, click elsewhere) while recognizing: don't translate behind the user's back.
+                DebugLog.Write("ScreenOcr: bubble dismissed during recognition");
+                return;
+            }
+            _bubble.SetRecognizing(false);
+            switch (outcome.Kind)
+            {
+                case OcrOutcomeKind.Text:
+                    _model.InputText = outcome.Text;
+                    _model.Translate();
+                    break;
+                case OcrOutcomeKind.NoText:
+                    _bubble.ShowNotice(L10n.T("ocr.no.text"), L10n.T("ocr.no.text.hint"), offerLanguageSettings: true);
+                    break;
+                case OcrOutcomeKind.NoRecognizers:
+                    _bubble.ShowNotice(L10n.T("ocr.unavailable"), L10n.T("ocr.install.hint"), offerLanguageSettings: true);
+                    break;
+                case OcrOutcomeKind.LanguageMissing:
+                    var language = L10n.LanguageName(outcome.MissingLanguage ?? _model.SourceCode);
+                    _bubble.ShowNotice(L10n.Format("ocr.language.missing", language), L10n.T("ocr.install.hint"), offerLanguageSettings: true);
+                    break;
+                default:
+                    _bubble.ShowNotice(L10n.T("ocr.failed"), null, offerLanguageSettings: false);
+                    break;
+            }
+        }
+        finally
+        {
+            _screenCaptureInProgress = false;
+        }
+    }
+
+    /// <summary>Captures, shows the overlays and returns the selection with a copy of its pixels; null when cancelled.</summary>
+    private async Task<(PixelRect Rect, BgraImage Image)?> SelectScreenAreaAsync()
+    {
+        var watch = Stopwatch.StartNew();
+        using var snapshot = ScreenSnapshot.CaptureAllMonitors();
+        DebugLog.Write($"ScreenOcr: captured {snapshot.Monitors.Count} monitor(s) in {watch.ElapsedMilliseconds} ms");
+        if (snapshot.Monitors.Count == 0)
+        {
+            return null;
+        }
+
+        var selector = new ScreenAreaSelector();
+        _screenSelector = selector;
+        ScreenAreaSelection? selection;
+        try
+        {
+            selector.Start(snapshot);
+            selection = await selector.Result;
+        }
+        finally
+        {
+            _screenSelector = null;
+        }
+        if (selection is null)
+        {
+            DebugLog.Write("ScreenOcr: selection cancelled");
+            return null;
+        }
+        var monitor = selection.Monitor.Monitor;
+        DebugLog.Write($"ScreenOcr: selected {selection.Rect.Width}x{selection.Rect.Height} px on a {monitor.Bounds.Width}x{monitor.Bounds.Height} monitor at {monitor.Scale:0.##}x");
+        var image = selection.Monitor.Image.Crop(SelectionGeometry.ToSnapshotPixels(selection.Rect, monitor.Bounds));
+        return image is null ? null : (selection.Rect, image);
+    }
+
+    private void OpenLanguageSettings()
+    {
+        _bubble?.HideWindow();
+        try
+        {
+            Process.Start(new ProcessStartInfo(LanguageSettingsUri) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write($"ScreenOcr: opening language settings failed ({ex.GetType().Name})");
+        }
+    }
+
     private void TranslateClipboard(PanelAnchor anchor)
     {
         ShowPanel(anchor);
@@ -399,7 +544,15 @@ public sealed class AppController : IDisposable
         string? failed = null;
         void Register(int id, Hotkey hotkey, Action action)
         {
-            if (!_hotkeys.Register(id, hotkey, () => _app.Dispatcher.BeginInvoke(action)))
+            // While the screen-area overlays are up, every shortcut would act on our own frozen screen instead.
+            void Guarded()
+            {
+                if (_screenSelector is null)
+                {
+                    action();
+                }
+            }
+            if (!_hotkeys.Register(id, hotkey, () => _app.Dispatcher.BeginInvoke(Guarded)))
             {
                 failed ??= hotkey.Display;
             }
@@ -408,6 +561,7 @@ public sealed class AppController : IDisposable
         Register(HotkeyManager.SelectionId, _settings.SelectionHotkey, () => _ = TranslateSelectionAsync());
         Register(HotkeyManager.ClipboardId, _settings.ClipboardHotkey, () => TranslateClipboard(PanelAnchor.Cursor));
         Register(HotkeyManager.PanelId, _settings.PanelHotkey, TogglePanelFromHotkey);
+        Register(HotkeyManager.ScreenId, _settings.ScreenHotkey, () => _ = TranslateScreenAreaAsync());
         _settings.HotkeyError = failed is null ? null : L10n.Format("hotkey.taken", failed);
     }
 
@@ -423,6 +577,7 @@ public sealed class AppController : IDisposable
         menu.Items.Add(CreateMenuItem(L10n.T("open.panel"), Hotkey.None, () => ShowPanel(PanelAnchor.Tray)));
         menu.Items.Add(CreateMenuItem(L10n.T("hotkey.selection"), _settings.SelectionHotkey, () => _ = TranslateSelectionFromMenuAsync()));
         menu.Items.Add(CreateMenuItem(L10n.T("hotkey.clipboard"), _settings.ClipboardHotkey, () => TranslateClipboard(PanelAnchor.Tray)));
+        menu.Items.Add(CreateMenuItem(L10n.T("hotkey.screen"), _settings.ScreenHotkey, () => _ = TranslateScreenAreaAsync(fromTrayMenu: true)));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem(L10n.T("history"), Hotkey.None, ShowHistory));
         menu.Items.Add(CreateMenuItem(L10n.T("settings"), Hotkey.None, ShowSettings));
