@@ -5,8 +5,8 @@ namespace Translator.UI;
 public readonly record struct PrivacyCapsuleContent(string Glyph, string? Label);
 
 /// <summary>
-/// What the panel's privacy capsule shows. The full sentence (<see cref="TranslatorModel.EnginePrivacyText"/>)
-/// lives in the tooltip; the capsule itself only gets an icon and the engine name so it fits the compact panel.
+/// What the engine indicator under the panel's result shows. The full sentence (<see cref="TranslatorModel.EnginePrivacyText"/>)
+/// lives in the tooltip; the indicator itself only gets an icon and the engine name so it fits the compact panel.
 /// </summary>
 public static class PrivacyCapsule
 {

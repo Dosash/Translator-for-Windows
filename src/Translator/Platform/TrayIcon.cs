@@ -13,6 +13,13 @@ public sealed class TrayIconClickEventArgs(PixelPoint position) : EventArgs
     public PixelPoint Position { get; } = position;
 }
 
+internal enum TrayMouseAction
+{
+    None,
+    Primary,
+    Context,
+}
+
 /// <summary>
 /// The notification-area icon: <c>Shell_NotifyIconW</c> on a hidden top-level window (not
 /// message-only, so it receives the broadcast "TaskbarCreated" message and re-adds the icon after
@@ -32,6 +39,7 @@ public sealed class TrayIcon : IDisposable
     private string _tooltip = string.Empty;
     private int _addAttempts;
     private bool _added;
+    private bool _version4;
     private bool _disposed;
 
     public event EventHandler<TrayIconClickEventArgs>? LeftClick;
@@ -70,7 +78,7 @@ public sealed class TrayIcon : IDisposable
         _addAttempts = 0;
         var version = BuildData(0);
         version.uVersionOrTimeout = NativeMethods.NOTIFYICON_VERSION_4;
-        NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_SETVERSION, ref version);
+        _version4 = NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_SETVERSION, ref version);
     }
 
     /// <summary>
@@ -177,6 +185,18 @@ public sealed class TrayIcon : IDisposable
         return data;
     }
 
+    /// <summary>
+    /// With NOTIFYICON_VERSION_4 a right click arrives as WM_RBUTTONUP and then WM_CONTEXTMENU (the menu key and
+    /// Shift+F10 send WM_CONTEXTMENU too). Reacting to both opened the menu twice, and the second open dismissed the first.
+    /// </summary>
+    internal static TrayMouseAction ClassifyMouseMessage(int mouseMsg, bool version4) => mouseMsg switch
+    {
+        NativeMethods.WM_LBUTTONUP => TrayMouseAction.Primary,
+        NativeMethods.WM_CONTEXTMENU => TrayMouseAction.Context,
+        NativeMethods.WM_RBUTTONUP when !version4 => TrayMouseAction.Context,
+        _ => TrayMouseAction.None,
+    };
+
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_TRAYICON)
@@ -185,15 +205,16 @@ public sealed class TrayIcon : IDisposable
             var x = unchecked((short)(wParam.ToInt64() & 0xFFFF));
             var y = unchecked((short)((wParam.ToInt64() >> 16) & 0xFFFF));
             var position = new PixelPoint(x, y);
-            if (mouseMsg == NativeMethods.WM_LBUTTONUP)
+            switch (ClassifyMouseMessage(mouseMsg, _version4))
             {
-                LeftClick?.Invoke(this, new TrayIconClickEventArgs(position));
-                handled = true;
-            }
-            else if (mouseMsg is NativeMethods.WM_RBUTTONUP or NativeMethods.WM_CONTEXTMENU)
-            {
-                RightClick?.Invoke(this, new TrayIconClickEventArgs(position));
-                handled = true;
+                case TrayMouseAction.Primary:
+                    LeftClick?.Invoke(this, new TrayIconClickEventArgs(position));
+                    handled = true;
+                    break;
+                case TrayMouseAction.Context:
+                    RightClick?.Invoke(this, new TrayIconClickEventArgs(position));
+                    handled = true;
+                    break;
             }
             return IntPtr.Zero;
         }

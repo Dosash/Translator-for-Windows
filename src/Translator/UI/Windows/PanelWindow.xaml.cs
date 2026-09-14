@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Translator.Core;
 
 namespace Translator.UI.Windows;
@@ -14,6 +16,7 @@ public partial class PanelWindow : FloatingWindow
     private readonly TranslatorModel _model;
     private readonly SettingsStore _settings;
     private int _copyFeedbackVersion;
+    private bool _syncingMode;
 
     public PanelWindow(TranslatorModel model, SettingsStore settings)
     {
@@ -23,9 +26,15 @@ public partial class PanelWindow : FloatingWindow
         DataContext = model;
         settings.PropertyChanged += OnSettingsPropertyChanged;
         model.PropertyChanged += OnModelPropertyChanged;
-        L10n.LanguageChanged += (_, _) => UpdatePrivacyCapsule();
+        L10n.LanguageChanged += (_, _) =>
+        {
+            UpdateEngineIndicator();
+            ScheduleModeLabelsUpdate();
+        };
+        Loaded += (_, _) => ScheduleModeLabelsUpdate();
         ApplyPanelSize();
-        UpdatePrivacyCapsule();
+        UpdateModeSwitch();
+        UpdateEngineIndicator();
     }
 
     public event EventHandler? QuitRequested;
@@ -40,6 +49,7 @@ public partial class PanelWindow : FloatingWindow
     protected override void OnShownPlaced()
     {
         _model.UpdateOfflineFooter();
+        ScheduleModeLabelsUpdate();
         FocusInput();
     }
 
@@ -60,6 +70,7 @@ public partial class PanelWindow : FloatingWindow
         Width = mode.PanelWidth();
         InputBox.Height = mode.TextAreaHeight();
         ResultBox.Height = mode.ResultHeight();
+        ScheduleModeLabelsUpdate();
     }
 
     private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -70,24 +81,77 @@ public partial class PanelWindow : FloatingWindow
         }
         else if (e.PropertyName == nameof(SettingsStore.OfflineOnly))
         {
-            UpdatePrivacyCapsule();
+            UpdateModeSwitch();
+            UpdateEngineIndicator();
         }
     }
 
     private void OnModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(TranslatorModel.Engine))
+        if (e.PropertyName is nameof(TranslatorModel.Engine) or nameof(TranslatorModel.OutputText))
         {
-            UpdatePrivacyCapsule();
+            UpdateEngineIndicator();
         }
     }
 
-    private void UpdatePrivacyCapsule()
+    private void UpdateModeSwitch()
+    {
+        _syncingMode = true;
+        OnlineMode.IsChecked = !_settings.OfflineOnly;
+        OfflineMode.IsChecked = _settings.OfflineOnly;
+        _syncingMode = false;
+    }
+
+    private void OnOnlineModeChecked(object sender, RoutedEventArgs e) => SetOfflineOnly(false);
+
+    private void OnOfflineModeChecked(object sender, RoutedEventArgs e) => SetOfflineOnly(true);
+
+    private void SetOfflineOnly(bool offlineOnly)
+    {
+        if (!_syncingMode)
+        {
+            // The model reacts to the setting: it refreshes the offline footer and translates again.
+            _settings.OfflineOnly = offlineOnly;
+        }
+    }
+
+    private void UpdateEngineIndicator()
     {
         var content = PrivacyCapsule.Describe(_model.Engine, _settings.OfflineOnly);
-        PrivacyIcon.Text = content.Glyph;
-        PrivacyLabel.Text = content.Label ?? string.Empty;
-        PrivacyLabel.Visibility = content.Label is null ? Visibility.Collapsed : Visibility.Visible;
+        EngineIcon.Text = content.Glyph;
+        EngineName.Text = content.Label ?? string.Empty;
+        EngineIndicator.ToolTip = _model.EnginePrivacyText;
+        AutomationProperties.SetName(EngineIndicator, _model.EnginePrivacyText);
+        EngineIndicator.Visibility = _model.Engine != EngineKind.None && !string.IsNullOrEmpty(_model.OutputText)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void ScheduleModeLabelsUpdate() => Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdateModeLabels);
+
+    /// <summary>
+    /// The mode switch keeps only its icons (and tooltips) when the labels would squeeze the title:
+    /// in the compact panel and for long translations of "Online"/"Offline".
+    /// </summary>
+    private void UpdateModeLabels()
+    {
+        if (HeaderGrid.ActualWidth <= 0)
+        {
+            return;
+        }
+        SetModeLabelsVisible(true);
+        // Measure results are cached per constraint, so the switch must go through a layout pass with its labels back.
+        UpdateLayout();
+        TitleStack.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var needed = Logo.ActualWidth + TitleStack.DesiredSize.Width + ModeSwitch.DesiredSize.Width;
+        SetModeLabelsVisible(needed <= HeaderGrid.ActualWidth);
+    }
+
+    private void SetModeLabelsVisible(bool visible)
+    {
+        var visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        OnlineLabel.Visibility = visibility;
+        OfflineLabel.Visibility = visibility;
     }
 
     private void OnSwapClick(object sender, RoutedEventArgs e) => _model.SwapLanguages();

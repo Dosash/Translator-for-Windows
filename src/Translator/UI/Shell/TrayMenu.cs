@@ -40,7 +40,11 @@ internal sealed class TrayMenu : IDisposable
 
     public void Show(ContextMenu menu)
     {
-        Close();
+        // Never replace an open menu: closing it hides the host window, which would dismiss the new one too.
+        if (IsOpen)
+        {
+            return;
+        }
         _host.Show();
         if (!_host.Activate())
         {
@@ -76,6 +80,9 @@ internal sealed class TrayMenu : IDisposable
         {
             _menu = null;
         }
-        _host.Hide();
+        if (_menu is null)
+        {
+            _host.Hide();
+        }
     }
 }

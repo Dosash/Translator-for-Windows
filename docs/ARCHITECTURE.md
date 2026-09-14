@@ -331,3 +331,6 @@ The English text is the source of truth for meaning.
 | ocr.translation | Translation |
 | ocr.translation.help | Show the translation |
 | ocr.copy.original | Copy recognized text |
+| mode.online | Online |
+| mode.offline | Offline |
+| mode.online.help | Translate with Google; offline models are used without internet |

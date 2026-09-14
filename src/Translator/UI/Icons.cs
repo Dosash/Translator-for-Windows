@@ -19,5 +19,6 @@ public static class Icons
     public const string Keyboard = "";
     public const string Download = "";
     public const string Warning = "";
+    public const string Delete = "";
     public const string Shield = "";
 }

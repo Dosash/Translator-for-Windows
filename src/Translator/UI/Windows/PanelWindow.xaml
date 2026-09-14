@@ -8,26 +8,37 @@
                   Width="400">
     <StackPanel Margin="16">
         <!-- Header -->
-        <Grid>
+        <Grid x:Name="HeaderGrid">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <c:LogoMark Size="34" VerticalAlignment="Center" />
-            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+            <c:LogoMark x:Name="Logo" Size="34" VerticalAlignment="Center" />
+            <StackPanel x:Name="TitleStack" Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource TitleText}" Text="{ui:Loc app.title}" />
                 <TextBlock Style="{StaticResource SubtitleText}" Text="{ui:Loc app.subtitle}" />
             </StackPanel>
-            <!-- Short capsule; the full privacy sentence is in the tooltip. -->
-            <Border Grid.Column="2" Style="{StaticResource Capsule}" Margin="10,0,0,0"
-                    HorizontalAlignment="Right" VerticalAlignment="Center"
-                    ToolTip="{Binding EnginePrivacyText}" AutomationProperties.Name="{Binding EnginePrivacyText}">
+            <!-- Online / offline switch; which engine actually translated is shown under the result. -->
+            <Border x:Name="ModeSwitch" Grid.Column="2" Margin="8,0,0,0" Style="{StaticResource Capsule}"
+                    Padding="2" CornerRadius="14" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="PrivacyIcon" Style="{StaticResource IconText}" FontSize="10.5"
-                               Foreground="{DynamicResource SageBrush}" />
-                    <TextBlock x:Name="PrivacyLabel" Margin="5,0,0,0" VerticalAlignment="Center" FontSize="10.5" FontWeight="Medium"
-                               TextTrimming="CharacterEllipsis" Foreground="{DynamicResource SageBrush}" />
+                    <RadioButton x:Name="OnlineMode" GroupName="EngineMode" Style="{StaticResource ModeSegment}"
+                                 Checked="OnOnlineModeChecked"
+                                 ToolTip="{ui:Loc mode.online.help}" AutomationProperties.Name="{ui:Loc mode.online}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource IconText}" FontSize="11" Text="{x:Static ui:Icons.Globe}" />
+                            <TextBlock x:Name="OnlineLabel" Margin="4,0,0,0" VerticalAlignment="Center" Text="{ui:Loc mode.online}" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="OfflineMode" GroupName="EngineMode" Style="{StaticResource ModeSegment}"
+                                 Checked="OnOfflineModeChecked"
+                                 ToolTip="{ui:Loc offline.only.caption}" AutomationProperties.Name="{ui:Loc mode.offline}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource IconText}" FontSize="11" Text="{x:Static ui:Icons.Lock}" />
+                            <TextBlock x:Name="OfflineLabel" Margin="4,0,0,0" VerticalAlignment="Center" Text="{ui:Loc mode.offline}" />
+                        </StackPanel>
+                    </RadioButton>
                 </StackPanel>
             </Border>
         </Grid>
@@ -98,16 +109,26 @@
                                Foreground="{DynamicResource InkFaintBrush}" Text="{ui:Loc result.placeholder}"
                                Visibility="{Binding OutputText, Converter={StaticResource CollapsedWhen}}" />
                 </Grid>
-                <StackPanel Margin="0,8,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Style="{StaticResource IconCircleButton}" Background="{DynamicResource SkyBrush}"
-                            Content="{x:Static ui:Icons.Speaker}" Click="OnSpeakOutputClick"
-                            IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}"
-                            ToolTip="{ui:Loc speak.translation}" AutomationProperties.Name="{ui:Loc speak.translation}" />
-                    <Button x:Name="CopyButton" Margin="8,0,0,0" Style="{StaticResource IconCircleButton}"
-                            Content="{x:Static ui:Icons.Copy}" Click="OnCopyClick"
-                            IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}"
-                            ToolTip="{ui:Loc copy.translation}" AutomationProperties.Name="{ui:Loc copy.translation}" />
-                </StackPanel>
+                <DockPanel Margin="0,8,0,0" LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Style="{StaticResource IconCircleButton}" Background="{DynamicResource SkyBrush}"
+                                Content="{x:Static ui:Icons.Speaker}" Click="OnSpeakOutputClick"
+                                IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}"
+                                ToolTip="{ui:Loc speak.translation}" AutomationProperties.Name="{ui:Loc speak.translation}" />
+                        <Button x:Name="CopyButton" Margin="8,0,0,0" Style="{StaticResource IconCircleButton}"
+                                Content="{x:Static ui:Icons.Copy}" Click="OnCopyClick"
+                                IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}"
+                                ToolTip="{ui:Loc copy.translation}" AutomationProperties.Name="{ui:Loc copy.translation}" />
+                    </StackPanel>
+                    <!-- Which engine produced this result; the full privacy sentence is in the tooltip. -->
+                    <StackPanel x:Name="EngineIndicator" DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center"
+                                Background="Transparent" Visibility="Collapsed">
+                        <TextBlock x:Name="EngineIcon" Style="{StaticResource IconText}" FontSize="10.5"
+                                   Foreground="{DynamicResource SageBrush}" />
+                        <TextBlock x:Name="EngineName" Margin="5,0,0,0" VerticalAlignment="Center" FontSize="11" FontWeight="Medium"
+                                   Foreground="{DynamicResource SageBrush}" />
+                    </StackPanel>
+                </DockPanel>
             </StackPanel>
         </Border>
 

@@ -5,7 +5,7 @@
              xmlns:c="clr-namespace:Translator.UI.Controls"
              xmlns:w="clr-namespace:Translator.UI.Windows"
              Title="{ui:Loc offline.languages, TrimEllipsis=True}">
-    <StackPanel Width="400">
+    <StackPanel Width="440">
         <StackPanel Margin="18">
             <StackPanel Orientation="Horizontal">
                 <c:LogoMark Size="30" VerticalAlignment="Center" />
@@ -29,7 +29,7 @@
 
             <Border Margin="0,12,0,0" Style="{StaticResource Card}" Padding="0,4">
                 <StackPanel>
-                    <DockPanel Margin="12,8">
+                    <DockPanel Margin="12,10">
                         <Ellipse DockPanel.Dock="Left" Width="7" Height="7" VerticalAlignment="Center" Fill="{DynamicResource SageBrush}" />
                         <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource SageBrush}"
                                    Text="{ui:Loc base.language}" />
@@ -40,7 +40,7 @@
                             <DataTemplate>
                                 <StackPanel>
                                     <Border Margin="12,0" Style="{StaticResource Divider}" />
-                                    <Grid Margin="12,7" MinHeight="22">
+                                    <Grid Margin="12,7" MinHeight="26">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -61,34 +61,42 @@
                                                 </Style>
                                             </Ellipse.Style>
                                         </Ellipse>
-                                        <StackPanel Grid.Column="1" Margin="8,0,0,0" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <TextBlock VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Text="{Binding Name}" />
-                                            <Border Margin="8,0,0,0" Style="{StaticResource Capsule}" Padding="6,1" VerticalAlignment="Center"
-                                                    Visibility="{Binding IsBasicQuality, Converter={StaticResource VisibleWhen}}">
-                                                <TextBlock FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Text="{ui:Loc offline.quality.basic}" />
-                                            </Border>
+                                        <!-- The quality note sits under the name so the row actions keep their room. -->
+                                        <StackPanel Grid.Column="1" Margin="8,0,8,0" VerticalAlignment="Center">
+                                            <TextBlock FontSize="13" FontWeight="Medium" TextTrimming="CharacterEllipsis" Text="{Binding Name}" />
+                                            <TextBlock Margin="0,1,0,0" FontSize="10.5" Foreground="{DynamicResource InkFaintBrush}"
+                                                       Text="{ui:Loc offline.quality.basic}"
+                                                       Visibility="{Binding IsBasicQuality, Converter={StaticResource VisibleWhen}}" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!-- Not installed: size + Download -->
                                             <TextBlock Margin="0,0,10,0" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource InkFaintBrush}"
                                                        Text="{Binding SizeText}" Visibility="{Binding Actions.ShowDownload, Converter={StaticResource VisibleWhen}}" />
+                                            <Button Style="{StaticResource AccentRowButton}" Tag="{x:Static ui:Icons.Download}"
+                                                    Content="{ui:Loc download}" Click="OnDownloadClick" IsEnabled="{Binding CanStart}"
+                                                    Visibility="{Binding Actions.ShowDownload, Converter={StaticResource VisibleWhen}}" />
+                                            <!-- Downloading: percent + Cancel -->
                                             <TextBlock Margin="0,0,10,0" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource InkMutedBrush}"
                                                        Text="{Binding ProgressText}" Visibility="{Binding Actions.ShowProgress, Converter={StaticResource VisibleWhen}}" />
-                                            <Button Style="{StaticResource LinkButton}" Foreground="{DynamicResource InkSubtleBrush}"
+                                            <Button Style="{StaticResource RowButton}" Tag="{x:Static ui:Icons.Close}"
                                                     Content="{ui:Loc offline.cancel}" Click="OnCancelClick"
                                                     Visibility="{Binding Actions.ShowProgress, Converter={StaticResource VisibleWhen}}" />
-                                            <TextBlock Margin="0,0,10,0" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource SageBrush}"
-                                                       Text="{ui:Loc downloaded}" Visibility="{Binding Actions.ShowDownloaded, Converter={StaticResource VisibleWhen}}" />
-                                            <TextBlock VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource InkFaintBrush}"
-                                                       Text="{ui:Loc unsupported}" Visibility="{Binding Actions.ShowUnsupported, Converter={StaticResource VisibleWhen}}" />
-                                            <Button Style="{StaticResource LinkButton}" Content="{ui:Loc download}" Click="OnDownloadClick"
-                                                    IsEnabled="{Binding CanStart}"
-                                                    Visibility="{Binding Actions.ShowDownload, Converter={StaticResource VisibleWhen}}" />
-                                            <Button Margin="0,0,10,0" Style="{StaticResource LinkButton}" Content="{ui:Loc update}" Click="OnDownloadClick"
-                                                    IsEnabled="{Binding CanStart}"
+                                            <!-- Installed: status chip (or Update) + Remove -->
+                                            <Border Style="{StaticResource SuccessChip}"
+                                                    Visibility="{Binding Actions.ShowDownloaded, Converter={StaticResource VisibleWhen}}">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Style="{StaticResource IconText}" FontSize="10" Text="{x:Static ui:Icons.Check}" />
+                                                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="{ui:Loc downloaded}" />
+                                                </StackPanel>
+                                            </Border>
+                                            <Button Style="{StaticResource SoftAccentRowButton}" Tag="{x:Static ui:Icons.Sync}"
+                                                    Content="{ui:Loc update}" Click="OnDownloadClick" IsEnabled="{Binding CanStart}"
                                                     Visibility="{Binding Actions.ShowUpdate, Converter={StaticResource VisibleWhen}}" />
-                                            <Button Style="{StaticResource LinkButton}" Foreground="{DynamicResource RoseInkBrush}"
+                                            <Button Margin="8,0,0,0" Style="{StaticResource DangerRowButton}" Tag="{x:Static ui:Icons.Delete}"
                                                     Content="{ui:Loc offline.remove}" Click="OnRemoveClick" IsEnabled="{Binding CanStart}"
                                                     Visibility="{Binding Actions.ShowRemove, Converter={StaticResource VisibleWhen}}" />
+                                            <TextBlock VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource InkFaintBrush}"
+                                                       Text="{ui:Loc unsupported}" Visibility="{Binding Actions.ShowUnsupported, Converter={StaticResource VisibleWhen}}" />
                                         </StackPanel>
                                     </Grid>
                                     <ProgressBar Margin="27,0,12,8" Style="{StaticResource ThinProgress}" Maximum="100" Value="{Binding Progress}"
