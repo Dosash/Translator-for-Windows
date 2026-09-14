@@ -6,7 +6,7 @@ with online translation (public Google Translate endpoint, no API keys) and opti
 ## Stack
 
 - .NET 10, WPF, C# (`net10.0-windows10.0.19041.0`, runs on Windows 10 1809+ and Windows 11).
-- No WinForms. Win32 interop via P/Invoke, WinRT APIs via the Windows TFM (speech, accent color).
+- No WinForms. Win32 interop via P/Invoke, WinRT APIs via the Windows TFM (speech, accent color, OCR).
 - Offline engine: ONNX Runtime + Opus-MT (Marian) models from Hugging Face, English as the pivot language.
 - Per-monitor V2 DPI aware (`app.manifest`).
 
@@ -33,12 +33,12 @@ installer/                      Inno Setup script
 | Module | Paths | Responsibility |
 |---|---|---|
 | Core | `src/Translator/Core/**` | `AppLanguage`, `L10n`, `SettingsStore`, `TranslatorModel`, `HistoryStore`, `GoogleTranslateEngine`, `UpdateChecker`, `SpeechService`, `DebugLog`, `Hotkey` |
-| Platform | `src/Translator/Platform/**` | hotkeys, clipboard, selection grab / paste (chord depends on the target app, see `InputProfile`), selection location (UI Automation / caret / mouse), tray icon, autostart, single instance + IPC, monitors |
+| Platform | `src/Translator/Platform/**` | hotkeys, clipboard, selection grab / paste (chord depends on the target app, see `InputProfile`), selection location (UI Automation / caret / mouse), tray icon, autostart, single instance + IPC, monitors, screen capture (`Capture/`), Windows OCR (`Ocr/`) |
 | Offline | `src/Translator.Offline/**` | model catalog, downloads, tokenizer, ONNX inference, language detection |
-| UI | `src/Translator/UI/**`, `App.xaml(.cs)`, `AppController.cs` | themes, styles, windows, window effects (DWM backdrop, corners) |
+| UI | `src/Translator/UI/**`, `App.xaml(.cs)`, `AppController.cs` | themes, styles, windows, window effects (DWM backdrop, corners), screen-area selection overlay (`ScreenCapture/`) |
 | Build | `tools/**`, `installer/**`, `build.ps1`, `.github/**`, `README.md` | icon, publish, installer, CI/CD, docs |
 
-Tests mirror the module folders: `tests/Translator.Tests/{Core,Platform,Offline}`.
+Tests mirror the module folders: `tests/Translator.Tests/{Core,Platform,Offline,UI}`.
 
 ## Conventions
 
@@ -53,7 +53,8 @@ Tests mirror the module folders: `tests/Translator.Tests/{Core,Platform,Offline}
   untested so far). Floating windows never re-anchor while being dragged, so a DPI change mid-drag doesn't
   snap them back; a tray-anchored panel without an icon rect uses the primary taskbar, not the cursor's monitor.
 - Privacy: never log or persist anything except settings and the last 10 history entries.
-  `DebugLog` gets lengths, states and errors — never the text itself.
+  `DebugLog` gets lengths, states and errors — never the text itself. Screen captures for OCR stay in memory
+  and are zeroed right after use; OCR logs sizes, scales, timings, recognizer tags and line counts only.
 - Files (all under `%TRANSLATOR_DATA_DIR%` instead when that variable is set, see CLI):
   - `%APPDATA%\Translator\settings.json`, `%APPDATA%\Translator\history.json`
   - `%LOCALAPPDATA%\Translator\models\` — offline models
@@ -74,6 +75,7 @@ Tests mirror the module folders: `tests/Translator.Tests/{Core,Platform,Offline}
 | Launch at login: SMAppService | `HKCU\...\Run` |
 | Themes Calm / Neon / Frost Glass, system accent | Same themes; Mica/Acrylic backdrop on Windows 11, Windows accent color |
 | Update check via GitHub Releases | Same (`Dosash/Translator-for-Windows`) |
+| — | `Ctrl+Alt+S` — translate a screen area: freeze-frame, drag a rectangle, `Windows.Media.Ocr` on this PC, bubble next to the area |
 
 The copy/paste chord is not always `Ctrl+C`/`Ctrl+V`: `InputProfile.Classify` looks at the target
 window's process image name and window class and picks one of three profiles — terminals and
@@ -93,6 +95,42 @@ Translation flow (`TranslatorModel.Translate`):
 5. Errors as on macOS (offline-only without models, no internet, generic failure).
 
 Auto-translate: 700 ms debounce after typing. History keeps the last 10 entries.
+
+## Screen-area translation
+
+Hotkey `Ctrl+Alt+S` (`HotkeyManager.ScreenId` = 4, `SettingsStore.ScreenHotkey`), tray menu item, or
+`--translate-screen`. `AppController.TranslateScreenAreaAsync`:
+
+1. Hide the panel and bubble (wait 250 ms if something was visible or the tray menu was used), then freeze-frame
+   every monitor with GDI `BitBlt` + `CAPTUREBLT` from the screen DC in physical pixels (`Platform/Capture/ScreenSnapshot`).
+2. `UI/ScreenCapture/ScreenAreaSelector` shows one `SelectionOverlayWindow` per monitor: borderless topmost tool
+   window whose bounds are forced to the monitor's pixels in `WM_WINDOWPOSCHANGING` (no DIP rounding, unchanged
+   by `WM_DPICHANGED`), showing the frozen image dimmed, crosshair cursor, a hint capsule. The drag rectangle is
+   undimmed with an accent border and a "W × H" label; it stays on the monitor where it started
+   (`SelectionGeometry`, unit-tested with 100% and 150%). Esc, right click, Alt+F4, a click smaller than 8 DIPs,
+   or switching to another app cancels. Other global shortcuts are ignored while the overlays are up.
+3. The selection is cropped (`BgraImage`) and `Platform/Ocr/ScreenTextRecognizer` runs off the UI thread:
+   - `OcrRecognizerChooser.Plan`: an explicit panel source language uses its recognizer, else an installed one for
+     the same script, else the bubble reports the missing language. `auto` runs the user-profile recognizer plus
+     one per script: Latin (profile or English), Cyrillic (ru, uk), Japanese, Simplified Chinese, Korean.
+   - `OcrScaling`: ×3 when the region is under 60 px tall; one retry at ×2–3 when nothing was found or the median
+     line is under 20 px; always within `OcrEngine.MaxImageDimension`. Catmull-Rom resampling, then 16 px of
+     padding in the dominant edge color (OCR misses glyphs touching the edge), `SoftwareBitmap` Bgra8 premultiplied.
+   - `OcrRecognizerChooser.PickBest`: a recognizer applied to another script returns look-alike gibberish
+     ("nepeBoA"), so results are scored by letters of the recognizer's own script, with penalties for digits
+     inside words, case flips, mixed Latin/Cyrillic and replacement characters.
+   - `OcrTextAssembler` rebuilds paragraphs from word boxes: joins lines with spaces (Chinese/Japanese without),
+     merges end-of-line hyphenation, starts a new paragraph on a large gap, an indent, a bullet, or after a line
+     that ended early. Paragraphs are separated by a newline.
+4. The bubble (`BubbleSource.Screen`) is anchored to the selection with `WindowPlacement.PlaceNearAnchor` and shows
+   "Recognizing text…", then the usual flow: `TranslatorModel.InputText` + `Translate()` (history as usual).
+   There is no "Replace"; "Original" toggles the recognized text (copy and speak act on what is shown); Expand
+   opens the panel with the recognized text. No text / no suitable recognizer show a notice with a link to
+   `ms-settings:regionlanguage`. Closing the bubble while recognizing drops the result.
+5. Pixels are zeroed after use (snapshot, crop, scaled copies, the overlay bitmap, the GDI DIB section).
+
+OCR languages come with Windows language features ("Optical character recognition"); installing one needs
+Windows Settings or `Add-WindowsCapability -Online -Name "Language.OCR~~~<tag>~0.0.1.0"` (administrator).
 
 ## Offline catalog
 
@@ -119,6 +157,7 @@ Up to 3 models stay loaded (≈400 MB each) and are released after 10 idle minut
 | `Translator.exe` | normal start (shows first-run window once) |
 | `Translator.exe --autostart` | start silently at sign-in |
 | `Translator.exe --translate "text"` | open the panel and translate (forwards to the running instance) |
+| `Translator.exe --translate-screen` | select a screen area and translate its text (forwards to the running instance) |
 | `Translator.exe --open panel\|settings\|history\|offline\|firstrun` | open that window (forwards to the running instance, or starts the app and opens it) |
 | `Translator.exe --quit` | ask the running instance to exit cleanly and wait until it's gone (exit code 0 also when nothing runs) |
 | `Translator.exe --test-translate "text"` | print the Google translation to the console and exit |
@@ -210,6 +249,8 @@ The English text is the source of truth for meaning.
 | hotkey.clipboard.caption | Translates what you have already copied |
 | hotkey.panel | Show translator panel |
 | hotkey.panel.caption | Opens the panel from any app |
+| hotkey.screen | Translate screen area |
+| hotkey.screen.caption | Select an area on screen: the text is recognized on this PC and translated |
 | hotkey.recording | Press a shortcut… |
 | hotkey.recorder.help | Click, then press a new shortcut. Esc — cancel, Backspace — turn off. |
 | hotkey.none | Off |
@@ -242,7 +283,7 @@ The English text is the source of truth for meaning.
 | first.subtitle | set up the translator for your workflow |
 | first.tray.title | Tray icon |
 | first.tray.caption | Translator lives in the notification area next to the clock. If the icon is hidden, click ^ and drag it to the taskbar. |
-| first.hotkeys.caption | {0} — selected text, {1} — clipboard, {2} — translator panel |
+| first.hotkeys.caption | {0} — selected text, {1} — clipboard, {2} — translator panel, {3} — screen area |
 | offline.download.caption | Download needed languages for translation without internet |
 | open | Open… |
 | done | Done |
@@ -276,3 +317,17 @@ The English text is the source of truth for meaning.
 | error.speech.voice | No voice is installed for {0}. Add one in Windows Settings → Time & language → Speech. |
 | error.speech.failed | Couldn't speak the text: {0} |
 | error.replace.failed | Couldn't insert the translation. Copy it and paste it manually. |
+| ocr.overlay.hint | Drag to select the text to translate · Esc — cancel |
+| ocr.recognizing | Recognizing text… |
+| ocr.no.text | No text found in the selected area |
+| ocr.no.text.hint | If the text is in another language, add text recognition for it in Windows settings. |
+| ocr.unavailable | Windows has no text recognition (OCR) installed for the app's languages. |
+| ocr.language.missing | Text recognition (OCR) for {0} isn't installed in Windows. |
+| ocr.install.hint | Open Language settings, choose the language → Language options and install “Optical character recognition” — or add the language first. |
+| ocr.open.settings | Language settings |
+| ocr.failed | Couldn't recognize text in the selected area. |
+| ocr.original | Original |
+| ocr.original.help | Show the recognized text |
+| ocr.translation | Translation |
+| ocr.translation.help | Show the translation |
+| ocr.copy.original | Copy recognized text |
