@@ -1,0 +1,65 @@
+name: UI smoke
+
+# Starts the published app on other Windows generations and on ARM64, opens every window in every
+# theme, captures screenshots and exercises --quit, online/offline translation and the installer.
+# See tests/smoke/ui-smoke.ps1.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/compat-testing]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Server 2022 = Windows 10 21H2 generation: no DWM system backdrop, no Segoe Fluent Icons.
+          - name: Server 2022 (Windows 10 generation, x64)
+            os: windows-2022
+            rid: win-x64
+            installer: true
+          - name: Server 2025 (Windows 11 24H2 generation, x64)
+            os: windows-2025
+            rid: win-x64
+            installer: false
+          # Hosted ARM64 runner, available to public repositories.
+          - name: Windows 11 ARM64
+            os: windows-11-arm
+            rid: win-arm64
+            installer: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          $installer = [bool]::Parse('${{ matrix.installer }}')
+          ./tests/smoke/ui-smoke.ps1 -Runtime ${{ matrix.rid }} -OutputDir artifacts/smoke -Installer:$installer
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-smoke-${{ matrix.os }}
+          path: artifacts/smoke
+          if-no-files-found: warn
+          retention-days: 14
