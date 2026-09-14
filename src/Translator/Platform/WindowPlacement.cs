@@ -5,6 +5,24 @@ namespace Translator.Platform;
 /// </summary>
 public static class WindowPlacement
 {
+    public const double GapDips = 10;
+    public const double MarginDips = 12;
+
+    /// <summary><see cref="PlaceNearAnchor(PixelSize, PixelRect, PixelRect, int, int)"/> with gap and margin scaled for the anchor's monitor.</summary>
+    public static PixelPoint PlaceNearAnchor(PixelSize window, PixelRect anchor, MonitorMetrics monitor) =>
+        PlaceNearAnchor(window, anchor, monitor.WorkArea, monitor.ToPixels(GapDips), monitor.ToPixels(MarginDips));
+
+    /// <summary><see cref="PlaceAtTray(PixelSize, PixelRect?, PixelRect, TaskbarEdge, int, int)"/> with gap and margin scaled for the monitor.</summary>
+    public static PixelPoint PlaceAtTray(PixelSize window, PixelRect? trayIconRect, MonitorMetrics monitor, TaskbarEdge edge) =>
+        PlaceAtTray(window, trayIconRect, monitor.WorkArea, edge, monitor.ToPixels(GapDips), monitor.ToPixels(MarginDips));
+
+    /// <summary>
+    /// What a tray-anchored window is placed against: the icon, else the primary taskbar (where the notification
+    /// area lives, e.g. when the icon is hidden in the overflow), and only then the cursor's monitor.
+    /// </summary>
+    public static PixelRect TrayReference(PixelRect? trayIconRect, PixelRect? primaryTaskbar, PixelRect cursor) =>
+        trayIconRect ?? primaryTaskbar ?? cursor;
+
     /// <summary>
     /// Above the anchor (e.g. the text selection), below it if it doesn't fit, clamped into the
     /// work area. Mirrors macOS <c>BubblePanel.show(near:)</c>.

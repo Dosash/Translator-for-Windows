@@ -17,6 +17,25 @@ public static class ScreenInfo
 
     public static PixelRect GetMonitorBounds(PixelRect near) => GetMonitorInfo(near).rcMonitor.ToPixelRect();
 
+    /// <summary>Bounds, work area and scale of the monitor nearest to <paramref name="near"/>.</summary>
+    public static MonitorMetrics GetMonitor(PixelRect near)
+    {
+        var info = GetMonitorInfo(near);
+        return new MonitorMetrics(info.rcMonitor.ToPixelRect(), info.rcWork.ToPixelRect(), GetScale(near));
+    }
+
+    /// <summary>The primary taskbar, which hosts the notification area; null when Explorer isn't running.</summary>
+    public static PixelRect? GetPrimaryTaskbarRect()
+    {
+        var taskbar = NativeMethods.FindTopLevelWindow(NativeMethods.PrimaryTaskbarClass, null);
+        if (taskbar == IntPtr.Zero || !NativeMethods.GetWindowRect(taskbar, out var rect))
+        {
+            return null;
+        }
+        var pixels = rect.ToPixelRect();
+        return pixels.Width > 0 && pixels.Height > 0 ? pixels : null;
+    }
+
     /// <summary>1.0 at 96 DPI (100% scaling).</summary>
     public static double GetScale(PixelRect near)
     {

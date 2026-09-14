@@ -255,29 +255,24 @@ public sealed class AppController : IDisposable
             iconRect = null;
         }
         var cursorRect = SelectionLocator.GetMouseRect();
-        _panel.ShowPlaced(size => PlaceAtTray(size, iconRect, cursorRect));
+        var near = anchor == PanelAnchor.Tray
+            ? WindowPlacement.TrayReference(iconRect, ScreenInfo.GetPrimaryTaskbarRect(), cursorRect)
+            : cursorRect;
+        _panel.ShowPlaced(size => PlaceAtTray(size, iconRect, near));
     }
 
     private void ShowBubble(PixelRect anchor)
     {
         _bubbleAnchor = anchor;
-        _bubble?.ShowPlaced(size =>
-        {
-            var scale = ScreenInfo.GetScale(anchor);
-            return WindowPlacement.PlaceNearAnchor(size, anchor, ScreenInfo.GetWorkArea(anchor), Scaled(10, scale), Scaled(12, scale));
-        });
+        _bubble?.ShowPlaced(size => WindowPlacement.PlaceNearAnchor(size, anchor, ScreenInfo.GetMonitor(anchor)));
     }
 
-    private static PixelPoint PlaceAtTray(PixelSize size, PixelRect? iconRect, PixelRect cursorRect)
+    private static PixelPoint PlaceAtTray(PixelSize size, PixelRect? iconRect, PixelRect near)
     {
-        var near = iconRect ?? cursorRect;
-        var workArea = ScreenInfo.GetWorkArea(near);
-        var edge = ScreenInfo.GetTaskbarEdge(ScreenInfo.GetMonitorBounds(near), workArea);
-        var scale = ScreenInfo.GetScale(near);
-        return WindowPlacement.PlaceAtTray(size, iconRect, workArea, edge, Scaled(10, scale), Scaled(12, scale));
+        var monitor = ScreenInfo.GetMonitor(near);
+        var edge = ScreenInfo.GetTaskbarEdge(monitor.Bounds, monitor.WorkArea);
+        return WindowPlacement.PlaceAtTray(size, iconRect, monitor, edge);
     }
-
-    private static int Scaled(int value, double scale) => (int)Math.Round(value * scale);
 
     // ---- Hotkey actions -----------------------------------------------------
 
