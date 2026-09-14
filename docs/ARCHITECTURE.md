@@ -48,7 +48,10 @@ Tests mirror the module folders: `tests/Translator.Tests/{Core,Platform,Offline}
   Background work uses `async`/`await`; results are applied on the UI thread.
 - Every user-visible string goes through `L10n.T(key)` / `L10n.Format(key, args)` (composite format `{0}`).
 - Screen geometry from `Platform` is in **physical pixels** (`PixelRect`). Windows are positioned with
-  `SetWindowPos` in pixels, so mixed-DPI multi-monitor setups work.
+  `SetWindowPos` in pixels, so mixed-DPI multi-monitor setups work. Gap/margin scaling per monitor lives in
+  `MonitorMetrics`/`WindowPlacement` and is unit-tested with a 100% + 150% layout (mixed-DPI hardware is
+  untested so far). Floating windows never re-anchor while being dragged, so a DPI change mid-drag doesn't
+  snap them back; a tray-anchored panel without an icon rect uses the primary taskbar, not the cursor's monitor.
 - Privacy: never log or persist anything except settings and the last 10 history entries.
   `DebugLog` gets lengths, states and errors — never the text itself.
 - Files (all under `%TRANSLATOR_DATA_DIR%` instead when that variable is set, see CLI):
