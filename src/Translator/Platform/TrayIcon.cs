@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Translator.Core;
 
@@ -21,11 +22,15 @@ public sealed class TrayIcon : IDisposable
 {
     private const uint IconId = 1;
     private const int WM_TRAYICON = NativeMethods.WM_APP + 1;
+    private const int MaxAddAttempts = 30;
+    private static readonly TimeSpan AddRetryInterval = TimeSpan.FromSeconds(2);
 
     private readonly uint _taskbarCreatedMessage;
     private HwndSource? _hwndSource;
+    private DispatcherTimer? _addRetryTimer;
     private IntPtr _hIcon;
     private string _tooltip = string.Empty;
+    private int _addAttempts;
     private bool _added;
     private bool _disposed;
 
@@ -46,17 +51,55 @@ public sealed class TrayIcon : IDisposable
 
     public void Show()
     {
-        RefreshIcon();
-        var data = BuildData(NativeMethods.NIF_MESSAGE | NativeMethods.NIF_ICON | NativeMethods.NIF_TIP | NativeMethods.NIF_SHOWTIP);
-        if (!NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_ADD, ref data))
+        if (_disposed)
         {
-            DebugLog.Write("TrayIcon.Show: Shell_NotifyIcon NIM_ADD failed");
             return;
         }
+        RefreshIcon();
+        var data = BuildData(NativeMethods.NIF_MESSAGE | NativeMethods.NIF_ICON | NativeMethods.NIF_TIP | NativeMethods.NIF_SHOWTIP);
+        // NIM_ADD can report failure after a timeout even though the icon was added; then NIM_MODIFY succeeds.
+        if (!NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_ADD, ref data)
+            && !NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_MODIFY, ref data))
+        {
+            ScheduleAddRetry();
+            return;
+        }
+        _addRetryTimer?.Stop();
         _added = true;
+        DebugLog.Write(_addAttempts == 0 ? "TrayIcon: added" : $"TrayIcon: added after {_addAttempts + 1} attempts");
+        _addAttempts = 0;
         var version = BuildData(0);
         version.uVersionOrTimeout = NativeMethods.NOTIFYICON_VERSION_4;
         NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_SETVERSION, ref version);
+    }
+
+    /// <summary>
+    /// At sign-in (--autostart) the notification area may not be ready yet, and some sessions have no shell
+    /// at all; retry for a while, after that only Explorer's "TaskbarCreated" broadcast adds the icon.
+    /// </summary>
+    private void ScheduleAddRetry()
+    {
+        _addAttempts++;
+        if (_addAttempts == 1)
+        {
+            DebugLog.Write("TrayIcon.Show: Shell_NotifyIcon NIM_ADD failed, retrying");
+        }
+        if (_addAttempts >= MaxAddAttempts)
+        {
+            _addRetryTimer?.Stop();
+            DebugLog.Write("TrayIcon: no notification area, waiting for TaskbarCreated");
+            return;
+        }
+        if (_addRetryTimer is null)
+        {
+            _addRetryTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = AddRetryInterval };
+            _addRetryTimer.Tick += (_, _) =>
+            {
+                _addRetryTimer.Stop();
+                Show();
+            };
+        }
+        _addRetryTimer.Start();
     }
 
     public void SetTooltip(string text)
@@ -168,8 +211,10 @@ public sealed class TrayIcon : IDisposable
         }
         else if (_taskbarCreatedMessage != 0 && msg == (int)_taskbarCreatedMessage)
         {
-            // Explorer restarted — the shell forgot about us, add the icon again.
+            // Explorer (re)started — the shell forgot about us, add the icon again.
             _added = false;
+            _addAttempts = 0;
+            _addRetryTimer?.Stop();
             Show();
         }
         return IntPtr.Zero;
@@ -269,6 +314,7 @@ public sealed class TrayIcon : IDisposable
             return;
         }
         _disposed = true;
+        _addRetryTimer?.Stop();
         if (_added && _hwndSource is not null)
         {
             var data = BuildData(0);
