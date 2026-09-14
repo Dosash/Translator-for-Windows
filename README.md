@@ -209,6 +209,10 @@ dotnet run --project tools/IconGen
 - `.github/workflows/release.yml` — публикует релиз. Собирает сборки для `win-x64` и `win-arm64`
   (портативные ZIP и установщики Inno Setup), считает контрольные суммы и создаёт/обновляет
   GitHub Release.
+- `.github/workflows/ui-smoke.yml` — UI smoke-тест на Windows Server 2022 (поколение Windows 10),
+  Windows Server 2025 (поколение Windows 11) и Windows 11 ARM64: открывает все окна во всех темах,
+  делает скриншоты, проверяет онлайн- и офлайн-перевод и установщик (`tests/smoke/ui-smoke.ps1`,
+  локально: `./tests/smoke/ui-smoke.ps1 -SkipOffline`).
 
 Чтобы выпустить новую версию:
 
@@ -228,8 +232,27 @@ Workflow также можно запустить вручную (`workflow_disp
 | `Translator.exe` | обычный запуск (при первом запуске показывает окно первого запуска) |
 | `Translator.exe --autostart` | тихий запуск при входе в Windows |
 | `Translator.exe --translate "текст"` | открыть панель и перевести текст (пересылается в уже запущенный экземпляр) |
+| `Translator.exe --open panel\|settings\|history\|offline\|firstrun` | открыть панель, настройки, историю, офлайн-языки или окно первого запуска; если приложение не запущено, оно запускается |
+| `Translator.exe --quit` | корректно завершить запущенный экземпляр (значок в трее исчезает) и дождаться выхода; ничего не делает, если приложение не запущено |
 | `Translator.exe --test-translate "текст"` | вывести перевод через Google в консоль и выйти |
 | `Translator.exe --test-offline "текст" [source] target` | вывести офлайн-перевод в консоль и выйти |
+
+Установщик вызывает `--quit` перед обновлением и удалением, чтобы приложение закрылось само
+(принудительное закрытие через Restart Manager осталось запасным вариантом).
+
+### Отдельная папка данных
+
+Если задана переменная окружения `TRANSLATOR_DATA_DIR`, настройки, история, офлайн-модели и логи
+хранятся в этой папке, а не в `%APPDATA%` / `%LOCALAPPDATA%` — это удобно для портативного
+использования и тестов:
+
+```powershell
+$env:TRANSLATOR_DATA_DIR = "D:\Translator-data"
+.\Translator.exe --open settings
+```
+
+Экземпляр с отдельной папкой данных считается отдельным профилем: он не пересылает аргументы
+обычному экземпляру, а `--open` и `--quit` действуют на экземпляр с той же папкой данных.
 
 ## Структура проекта
 
@@ -246,7 +269,9 @@ src/Translator/                 WPF-приложение (WinExe, AssemblyName "
   Assets/                       AppIcon.ico
 src/Translator.Offline/         офлайн-движок перевода (ONNX Runtime + Opus-MT)
 tests/Translator.Tests/         тесты xUnit
+tests/smoke/ui-smoke.ps1        UI smoke-тест (скриншоты окон, --quit, офлайн-движок, установщик)
 tools/IconGen/                  генератор иконки приложения
+tools/OfflineCli/               консольная утилита для офлайн-движка
 installer/Translator.iss        скрипт Inno Setup
 .github/workflows/              CI и релиз
 docs/                           ARCHITECTURE.md и изображения для README

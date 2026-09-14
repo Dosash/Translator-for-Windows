@@ -24,7 +24,18 @@ public class FloatingWindow : Window
     private bool _keepsVisibleBehindOtherWindows;
     private bool _allowClose;
     private bool _userMoved;
+    private bool _dragging;
     private Func<PixelSize, PixelPoint>? _placement;
+
+    internal enum PositionSource
+    {
+        /// <summary>Leave the position to the user/system (a drag is in progress).</summary>
+        Keep,
+        /// <summary>Re-anchor with the placement function.</summary>
+        Anchor,
+        /// <summary>Keep the user's position, clamped into the work area.</summary>
+        ClampUserPosition,
+    }
 
     public FloatingWindow()
     {
@@ -145,13 +156,14 @@ public class FloatingWindow : Window
             return IntPtr.Zero;
         }
         var pos = Marshal.PtrToStructure<UiNativeMethods.WINDOWPOS>(lParam);
-        if ((pos.flags & UiNativeMethods.SWP_NOSIZE) != 0 || pos.cx <= 0 || pos.cy <= 0)
+        var source = ChoosePositionSource(_dragging, _userMoved);
+        if ((pos.flags & UiNativeMethods.SWP_NOSIZE) != 0 || pos.cx <= 0 || pos.cy <= 0 || source == PositionSource.Keep)
         {
             return IntPtr.Zero;
         }
         var size = new PixelSize(pos.cx, pos.cy);
         PixelPoint target;
-        if (_userMoved)
+        if (source == PositionSource.ClampUserPosition)
         {
             var current = WindowPlacement.GetWindowRect(hwnd);
             var left = (pos.flags & UiNativeMethods.SWP_NOMOVE) != 0 ? current.Left : pos.x;
@@ -208,6 +220,7 @@ public class FloatingWindow : Window
             return;
         }
         var before = WindowPlacement.GetWindowRect(Handle);
+        _dragging = true;
         try
         {
             DragMove();
@@ -215,6 +228,10 @@ public class FloatingWindow : Window
         catch (InvalidOperationException)
         {
             return;
+        }
+        finally
+        {
+            _dragging = false;
         }
         if (WindowPlacement.GetWindowRect(Handle) != before)
         {
@@ -240,15 +257,23 @@ public class FloatingWindow : Window
         }
     }
 
+    /// <summary>
+    /// Dragging onto a monitor with another scale resizes the window mid-drag (WM_DPICHANGED); re-anchoring
+    /// then would snap it back to the tray or the selection, so nothing moves it while the drag lasts.
+    /// </summary>
+    internal static PositionSource ChoosePositionSource(bool dragging, bool userMoved) =>
+        dragging ? PositionSource.Keep : userMoved ? PositionSource.ClampUserPosition : PositionSource.Anchor;
+
     private void PlaceNow()
     {
-        if (_placement is null)
+        var source = ChoosePositionSource(_dragging, _userMoved);
+        if (_placement is null || source == PositionSource.Keep)
         {
             return;
         }
         var hwnd = Handle;
         var rect = WindowPlacement.GetWindowRect(hwnd);
-        var target = _userMoved
+        var target = source == PositionSource.ClampUserPosition
             ? ClampInto(rect, ScreenInfo.GetWorkArea(rect))
             : _placement(new PixelSize(rect.Width, rect.Height));
         if (target.X != rect.Left || target.Y != rect.Top)

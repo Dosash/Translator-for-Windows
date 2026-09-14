@@ -60,9 +60,10 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 #endif
 
-; Close a running Translator (via the Restart Manager) before copying files, and do the same
-; automatically during uninstall; do not auto-relaunch it afterwards — [Run] below already offers
-; to start it once setup finishes.
+; A running Translator is first asked to exit cleanly with "Translator.exe --quit" (see [Code]), so its
+; tray icon disappears. The Restart Manager settings below stay as the fallback for versions without
+; --quit or an instance that doesn't respond; do not auto-relaunch it afterwards — [Run] below
+; already offers to start it once setup finishes.
 CloseApplications=force
 CloseApplicationsFilter={#MyAppExeName}
 RestartApplications=no
@@ -124,6 +125,44 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// Waits (inside Translator.exe, up to ~20 s) until the running instance has exited.
+procedure QuitRunningApp(const ExePath: String);
+var
+  ResultCode: Integer;
+begin
+  if not FileExists(ExePath) then
+    exit;
+  if Exec(ExePath, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Log(Format('%s --quit exited with code %d', [ExePath, ResultCode]))
+  else
+    Log(Format('Could not run %s --quit: %s', [ExePath, SysErrorMessage(ResultCode)]));
+end;
+
+// 1.0.0 predates --quit: it would treat the flag as a normal second launch and open its panel.
+function InstalledAppSupportsQuit(const ExePath: String): Boolean;
+var
+  Version: String;
+begin
+  Result := FileExists(ExePath) and GetVersionNumbersString(ExePath, Version) and (Version <> '1.0.0.0');
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExePath: String;
+begin
+  Result := '';
+  ExePath := ExpandConstant('{app}\{#MyAppExeName}');
+  if InstalledAppSupportsQuit(ExePath) then
+    QuitRunningApp(ExePath);
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  // The uninstaller always comes with the exe it removes, so --quit is supported.
+  QuitRunningApp(ExpandConstant('{app}\{#MyAppExeName}'));
+  Result := True;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   AppDataDir, LocalAppDataDir, PromptText: String;

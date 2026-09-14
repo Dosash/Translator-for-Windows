@@ -47,6 +47,43 @@ public class SingleInstanceTests
     }
 
     [Fact]
+    public void IsRunning_follows_the_primary_lifetime()
+    {
+        var appId = UniqueAppId();
+        Assert.False(SingleInstance.IsRunning(appId));
+
+        var primary = SingleInstance.TryAcquire(appId);
+        Assert.NotNull(primary);
+        Assert.True(SingleInstance.IsRunning(appId));
+
+        primary!.Dispose();
+        Assert.False(SingleInstance.IsRunning(appId));
+    }
+
+    [Fact]
+    public async Task WaitUntilNotRunning_returns_once_the_primary_shuts_down()
+    {
+        var appId = UniqueAppId();
+        var acquired = new TaskCompletionSource();
+        var release = new TaskCompletionSource();
+        // The mutex has thread affinity, so own and release it on one dedicated thread.
+        var owner = new Thread(() =>
+        {
+            using var primary = SingleInstance.TryAcquire(appId);
+            acquired.SetResult();
+            release.Task.Wait();
+        });
+        owner.Start();
+        await acquired.Task;
+
+        Assert.False(SingleInstance.WaitUntilNotRunning(appId, TimeSpan.FromMilliseconds(150)));
+
+        release.SetResult();
+        Assert.True(SingleInstance.WaitUntilNotRunning(appId, TimeSpan.FromSeconds(5)));
+        owner.Join();
+    }
+
+    [Fact]
     public void SendToPrimary_returns_false_when_nobody_is_listening()
     {
         var appId = UniqueAppId();

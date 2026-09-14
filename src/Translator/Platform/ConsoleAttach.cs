@@ -15,11 +15,13 @@ public static class ConsoleAttach
         }
         try
         {
-            var stdout = new StreamWriter(Console.OpenStandardOutput(), Encoding.UTF8) { AutoFlush = true };
+            // No BOM: redirected output (scripts, CI) would otherwise start with U+FEFF.
+            var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            var stdout = new StreamWriter(Console.OpenStandardOutput(), utf8) { AutoFlush = true };
             Console.SetOut(stdout);
-            var stderr = new StreamWriter(Console.OpenStandardError(), Encoding.UTF8) { AutoFlush = true };
+            var stderr = new StreamWriter(Console.OpenStandardError(), utf8) { AutoFlush = true };
             Console.SetError(stderr);
-            Console.SetIn(new StreamReader(Console.OpenStandardInput(), Encoding.UTF8));
+            Console.SetIn(new StreamReader(Console.OpenStandardInput(), utf8));
         }
         catch (Exception ex)
         {

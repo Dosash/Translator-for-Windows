@@ -48,10 +48,13 @@ Tests mirror the module folders: `tests/Translator.Tests/{Core,Platform,Offline}
   Background work uses `async`/`await`; results are applied on the UI thread.
 - Every user-visible string goes through `L10n.T(key)` / `L10n.Format(key, args)` (composite format `{0}`).
 - Screen geometry from `Platform` is in **physical pixels** (`PixelRect`). Windows are positioned with
-  `SetWindowPos` in pixels, so mixed-DPI multi-monitor setups work.
+  `SetWindowPos` in pixels, so mixed-DPI multi-monitor setups work. Gap/margin scaling per monitor lives in
+  `MonitorMetrics`/`WindowPlacement` and is unit-tested with a 100% + 150% layout (mixed-DPI hardware is
+  untested so far). Floating windows never re-anchor while being dragged, so a DPI change mid-drag doesn't
+  snap them back; a tray-anchored panel without an icon rect uses the primary taskbar, not the cursor's monitor.
 - Privacy: never log or persist anything except settings and the last 10 history entries.
   `DebugLog` gets lengths, states and errors — never the text itself.
-- Files:
+- Files (all under `%TRANSLATOR_DATA_DIR%` instead when that variable is set, see CLI):
   - `%APPDATA%\Translator\settings.json`, `%APPDATA%\Translator\history.json`
   - `%LOCALAPPDATA%\Translator\models\` — offline models
   - `%LOCALAPPDATA%\Translator\logs\debug.log`
@@ -116,8 +119,40 @@ Up to 3 models stay loaded (≈400 MB each) and are released after 10 idle minut
 | `Translator.exe` | normal start (shows first-run window once) |
 | `Translator.exe --autostart` | start silently at sign-in |
 | `Translator.exe --translate "text"` | open the panel and translate (forwards to the running instance) |
+| `Translator.exe --open panel\|settings\|history\|offline\|firstrun` | open that window (forwards to the running instance, or starts the app and opens it) |
+| `Translator.exe --quit` | ask the running instance to exit cleanly and wait until it's gone (exit code 0 also when nothing runs) |
 | `Translator.exe --test-translate "text"` | print the Google translation to the console and exit |
 | `Translator.exe --test-offline "text" [source] target` | print the offline translation and exit |
+
+`--quit` never starts the app: it checks the single-instance mutex, sends the flag over the pipe and
+polls until the mutex is gone (then briefly waits for processes of the same exe). The installer runs it in
+`PrepareToInstall` (not for 1.0.0, which predates the flag) and `InitializeUninstall`;
+`CloseApplications=force` stays as the fallback.
+
+`TRANSLATOR_DATA_DIR` (environment variable) moves settings, history, models and logs into one directory
+(`settings.json`, `history.json`, `models\`, `logs\`) for tests and portable use. The single-instance
+mutex/pipe names get a hash of that directory, so such an instance never talks to the default one;
+`tools/OfflineCli` honors the variable too.
+
+## Compatibility testing
+
+`.github/workflows/ui-smoke.yml` runs `tests/smoke/ui-smoke.ps1` on hosted runners:
+
+| Runner label | Stands in for | What it exercises |
+|---|---|---|
+| `windows-2022` (x64) | Windows 10 21H2 generation (build 20348) | no DWM system backdrop, no Segoe Fluent Icons / Segoe UI Variable, installer install/uninstall |
+| `windows-2025` (x64) | Windows 11 24H2 generation (build 26100) | Mica/Acrylic path |
+| `windows-11-arm` (win-arm64) | Windows 11 on ARM64 | native ARM64 WPF and ONNX Runtime (checked via the PE machine type) |
+
+The hosted ARM64 image keeps its interactive session at the first-sign-in (OOBE) screen: there is no
+notification area and full-screen captures show only OOBE. The script therefore also saves each app window
+with `PrintWindow` (`*-window.png`), and tray icon removal is only verified where the icon could be added.
+
+The script publishes the app for the runner RID, opens every window in every theme with `--open` under
+an isolated `TRANSLATOR_DATA_DIR`, captures the virtual screen, fails on unhandled exceptions in
+`debug.log`, checks that every icon glyph exists in Segoe MDL2 Assets, runs `--test-translate` (HTTP 429 /
+network errors are warnings) and `--test-offline` after downloading `ru`, and on `windows-2022` installs,
+starts and uninstalls the Inno Setup build. Screenshots and logs are uploaded as workflow artifacts.
 
 ## Localization keys
 
