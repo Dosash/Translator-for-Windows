@@ -51,6 +51,10 @@ internal static partial class NativeMethods
     internal const uint MONITOR_DEFAULTTONEAREST = 2;
     internal const int MDT_EFFECTIVE_DPI = 0;
 
+    internal const uint DIB_RGB_COLORS = 0;
+    internal const uint SRCCOPY = 0x00CC0020;
+    internal const uint CAPTUREBLT = 0x40000000;
+
     internal const uint ABM_GETTASKBARPOS = 5;
 
     internal const int GWL_EXSTYLE = -20;
@@ -288,6 +292,12 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial IntPtr MonitorFromRect(in RECT lprc, uint dwFlags);
 
+    internal delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, IntPtr lprcMonitor, IntPtr dwData);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
     [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
@@ -372,6 +382,20 @@ internal static partial class NativeMethods
     [LibraryImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool DeleteObject(IntPtr hObject);
+
+    [LibraryImport("gdi32.dll")]
+    internal static partial IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DeleteDC(IntPtr hdc);
+
+    [LibraryImport("gdi32.dll")]
+    internal static partial IntPtr SelectObject(IntPtr hdc, IntPtr h);
+
+    [LibraryImport("gdi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool BitBlt(IntPtr hdc, int x, int y, int cx, int cy, IntPtr hdcSrc, int x1, int y1, uint rop);
 
     [LibraryImport("user32.dll")]
     internal static partial IntPtr GetDC(IntPtr hWnd);

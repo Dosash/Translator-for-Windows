@@ -19,6 +19,7 @@ public sealed class SettingsStore : ObservableObject
     private Hotkey _selectionHotkey = Hotkey.DefaultSelection;
     private Hotkey _clipboardHotkey = Hotkey.DefaultClipboard;
     private Hotkey _panelHotkey = Hotkey.DefaultPanel;
+    private Hotkey _screenHotkey = Hotkey.DefaultScreen;
     private bool _autoTranslate = true;
     private bool _offlineOnly;
     private AppTheme _appTheme = AppTheme.CalmGlass;
@@ -87,6 +88,13 @@ public sealed class SettingsStore : ObservableObject
     {
         get => _panelHotkey;
         set { if (SetField(ref _panelHotkey, value)) { Save(); HotkeysChanged?.Invoke(this, EventArgs.Empty); } }
+    }
+
+    /// <summary>"Translate screen area" (OCR). Settings files from before this shortcut existed get the default.</summary>
+    public Hotkey ScreenHotkey
+    {
+        get => _screenHotkey;
+        set { if (SetField(ref _screenHotkey, value)) { Save(); HotkeysChanged?.Invoke(this, EventArgs.Empty); } }
     }
 
     public bool AutoTranslate
@@ -264,6 +272,7 @@ public sealed class SettingsStore : ObservableObject
         _selectionHotkey = data.SelectionHotkey is null ? Hotkey.DefaultSelection : ParseHotkeyOrNone(data.SelectionHotkey);
         _clipboardHotkey = data.ClipboardHotkey is null ? Hotkey.DefaultClipboard : ParseHotkeyOrNone(data.ClipboardHotkey);
         _panelHotkey = data.PanelHotkey is null ? Hotkey.DefaultPanel : ParseHotkeyOrNone(data.PanelHotkey);
+        _screenHotkey = data.ScreenHotkey is null ? Hotkey.DefaultScreen : ParseHotkeyOrNone(data.ScreenHotkey);
         _autoTranslate = data.AutoTranslate ?? true;
         _offlineOnly = data.OfflineOnly ?? false;
         _appTheme = AppThemeInfo.Parse(data.AppTheme);
@@ -303,6 +312,7 @@ public sealed class SettingsStore : ObservableObject
                 SelectionHotkey = _selectionHotkey.Display,
                 ClipboardHotkey = _clipboardHotkey.Display,
                 PanelHotkey = _panelHotkey.Display,
+                ScreenHotkey = _screenHotkey.Display,
                 AutoTranslate = _autoTranslate,
                 OfflineOnly = _offlineOnly,
                 AppTheme = _appTheme.ToString(),
@@ -330,6 +340,7 @@ public sealed class SettingsStore : ObservableObject
         public string? SelectionHotkey { get; set; }
         public string? ClipboardHotkey { get; set; }
         public string? PanelHotkey { get; set; }
+        public string? ScreenHotkey { get; set; }
         public bool? AutoTranslate { get; set; }
         public bool? OfflineOnly { get; set; }
         public string? AppTheme { get; set; }

@@ -29,6 +29,8 @@ public class SettingsStoreTests : IDisposable
         Assert.Equal(Hotkey.DefaultSelection, settings.SelectionHotkey);
         Assert.Equal(Hotkey.DefaultClipboard, settings.ClipboardHotkey);
         Assert.Equal(Hotkey.DefaultPanel, settings.PanelHotkey);
+        Assert.Equal(Hotkey.DefaultScreen, settings.ScreenHotkey);
+        Assert.Equal("Ctrl+Alt+S", settings.ScreenHotkey.Display);
         Assert.True(settings.AutoTranslate);
         Assert.False(settings.OfflineOnly);
         Assert.Equal(AppTheme.CalmGlass, settings.AppTheme);
@@ -72,6 +74,51 @@ public class SettingsStoreTests : IDisposable
         var reloaded = new SettingsStore(_path);
         Assert.Equal(Hotkey.None, reloaded.ClipboardHotkey);
         Assert.True(reloaded.ClipboardHotkey.IsNone);
+    }
+
+    [Fact]
+    public void ScreenHotkeyPersistsAndReloads()
+    {
+        var settings = new SettingsStore(_path);
+        settings.ScreenHotkey = new Hotkey(ModifierKeys.Control | ModifierKeys.Shift, Key.O);
+
+        var reloaded = new SettingsStore(_path);
+        Assert.Equal(new Hotkey(ModifierKeys.Control | ModifierKeys.Shift, Key.O), reloaded.ScreenHotkey);
+        Assert.Contains("\"ScreenHotkey\"", File.ReadAllText(_path));
+    }
+
+    [Fact]
+    public void DisabledScreenHotkeyRoundTripsAsNone()
+    {
+        var settings = new SettingsStore(_path);
+        settings.ScreenHotkey = Hotkey.None;
+
+        Assert.True(new SettingsStore(_path).ScreenHotkey.IsNone);
+    }
+
+    [Fact]
+    public void SettingsFromBeforeTheScreenHotkeyGetItsDefault()
+    {
+        File.WriteAllText(_path, """{ "SelectionHotkey": "Ctrl+Alt+G", "PanelHotkey": "" }""");
+
+        var settings = new SettingsStore(_path);
+
+        Assert.Equal(new Hotkey(ModifierKeys.Control | ModifierKeys.Alt, Key.G), settings.SelectionHotkey);
+        Assert.True(settings.PanelHotkey.IsNone);
+        Assert.Equal(Hotkey.DefaultScreen, settings.ScreenHotkey);
+    }
+
+    [Fact]
+    public void ChangingScreenHotkeyRaisesHotkeysChanged()
+    {
+        var settings = new SettingsStore(_path);
+        var raised = 0;
+        settings.HotkeysChanged += (_, _) => raised++;
+
+        settings.ScreenHotkey = new Hotkey(ModifierKeys.Control | ModifierKeys.Alt, Key.O);
+        settings.ScreenHotkey = new Hotkey(ModifierKeys.Control | ModifierKeys.Alt, Key.O);
+
+        Assert.Equal(1, raised);
     }
 
     [Fact]

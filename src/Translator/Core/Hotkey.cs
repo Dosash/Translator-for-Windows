@@ -10,6 +10,7 @@ public readonly record struct Hotkey(ModifierKeys Modifiers, Key Key)
     public static Hotkey DefaultSelection { get; } = new(ModifierKeys.Control | ModifierKeys.Alt, Key.T);
     public static Hotkey DefaultClipboard { get; } = new(ModifierKeys.Control | ModifierKeys.Alt, Key.C);
     public static Hotkey DefaultPanel { get; } = new(ModifierKeys.Control | ModifierKeys.Alt, Key.Space);
+    public static Hotkey DefaultScreen { get; } = new(ModifierKeys.Control | ModifierKeys.Alt, Key.S);
 
     public bool IsNone => Key == Key.None;
 

@@ -71,6 +71,10 @@ public static class WindowPlacement
         NativeMethods.SetWindowPos(hwnd, IntPtr.Zero, position.X, position.Y, 0, 0,
             NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
 
+    public static void SetBounds(IntPtr hwnd, PixelRect bounds) =>
+        NativeMethods.SetWindowPos(hwnd, IntPtr.Zero, bounds.Left, bounds.Top, bounds.Width, bounds.Height,
+            NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
+
     public static PixelRect GetWindowRect(IntPtr hwnd)
     {
         NativeMethods.GetWindowRect(hwnd, out var rect);

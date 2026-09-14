@@ -7,29 +7,37 @@
                   Title="{ui:Loc app.title}"
                   Width="330">
     <StackPanel Margin="14">
+        <!-- Screen area: "no text found" or missing OCR languages instead of a translation. -->
+        <StackPanel x:Name="NoticePanel" Visibility="Collapsed">
+            <TextBlock x:Name="NoticeText" TextWrapping="Wrap" FontSize="13" FontWeight="Medium"
+                       Foreground="{DynamicResource InkBrush}" />
+            <TextBlock x:Name="NoticeHint" Style="{StaticResource CaptionText}" Margin="0,4,0,0" />
+            <Button x:Name="LanguageSettingsButton" Margin="0,8,0,0" HorizontalAlignment="Left" Style="{StaticResource LinkButton}"
+                    Content="{ui:Loc ocr.open.settings}" Click="OnLanguageSettingsClick" />
+        </StackPanel>
         <TextBlock x:Name="ErrorText" TextWrapping="Wrap" FontSize="12.5" Foreground="{DynamicResource RoseInkBrush}"
                    Text="{Binding ErrorMessage}" />
         <StackPanel x:Name="ProgressRow" Orientation="Horizontal">
             <c:Spinner />
-            <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="12.5"
-                       Foreground="{DynamicResource InkMutedBrush}" Text="{ui:Loc translating}" />
+            <TextBlock x:Name="ProgressText" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="12.5"
+                       Foreground="{DynamicResource InkMutedBrush}" />
         </StackPanel>
         <!-- About 12 lines of text before it scrolls. -->
         <TextBox x:Name="OutputBox" Style="{StaticResource ReadOnlyTextBox}" MaxHeight="228"
                  VerticalScrollBarVisibility="Auto" Text="{Binding OutputText, Mode=OneWay}" />
+        <TextBox x:Name="OriginalBox" Style="{StaticResource ReadOnlyTextBox}" MaxHeight="228" Visibility="Collapsed"
+                 VerticalScrollBarVisibility="Auto" Text="{Binding InputText, Mode=OneWay}" />
 
-        <DockPanel Margin="0,10,0,0" LastChildFill="False">
+        <DockPanel x:Name="ActionsRow" Margin="0,10,0,0" LastChildFill="False">
             <Button x:Name="ReplaceButton" DockPanel.Dock="Left" Style="{StaticResource PillButton}" IsDefault="True"
                     Content="{ui:Loc replace}" Click="OnReplaceClick" ToolTip="{ui:Loc replace.help}"
                     IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}" />
-            <Button DockPanel.Dock="Left" Margin="8,0,0,0" Style="{StaticResource IconCircleButton24}"
-                    Background="{DynamicResource SkyBrush}" Content="{x:Static ui:Icons.Speaker}" Click="OnSpeakClick"
-                    IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}"
-                    ToolTip="{ui:Loc speak.translation}" AutomationProperties.Name="{ui:Loc speak.translation}" />
+            <Button x:Name="OriginalToggle" DockPanel.Dock="Left" Style="{StaticResource LinkButton}"
+                    Click="OnOriginalToggleClick" Visibility="Collapsed" />
+            <Button x:Name="SpeakButton" DockPanel.Dock="Left" Margin="8,0,0,0" Style="{StaticResource IconCircleButton24}"
+                    Background="{DynamicResource SkyBrush}" Content="{x:Static ui:Icons.Speaker}" Click="OnSpeakClick" />
             <Button x:Name="CopyButton" DockPanel.Dock="Left" Margin="8,0,0,0" Style="{StaticResource IconCircleButton24}"
-                    Content="{x:Static ui:Icons.Copy}" Click="OnCopyClick"
-                    IsEnabled="{Binding OutputText, Converter={StaticResource Truthy}}"
-                    ToolTip="{ui:Loc copy.translation}" AutomationProperties.Name="{ui:Loc copy.translation}" />
+                    Content="{x:Static ui:Icons.Copy}" Click="OnCopyClick" />
             <Button DockPanel.Dock="Right" Style="{StaticResource GhostIconButton}" Content="{x:Static ui:Icons.Expand}"
                     Click="OnExpandClick" ToolTip="{ui:Loc expand.panel}" AutomationProperties.Name="{ui:Loc expand.panel}" />
             <TextBlock x:Name="EngineText" DockPanel.Dock="Right" Margin="0,0,6,0" VerticalAlignment="Center"

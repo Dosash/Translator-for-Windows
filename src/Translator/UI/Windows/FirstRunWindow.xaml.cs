@@ -42,7 +42,8 @@ public partial class FirstRunWindow : AuxWindow
 
     private void UpdateHotkeysCaption() =>
         HotkeysCaption.Text = L10n.Format("first.hotkeys.caption",
-            Display(_settings.SelectionHotkey), Display(_settings.ClipboardHotkey), Display(_settings.PanelHotkey));
+            Display(_settings.SelectionHotkey), Display(_settings.ClipboardHotkey), Display(_settings.PanelHotkey),
+            Display(_settings.ScreenHotkey));
 
     private void UpdateThemeSelection()
     {
