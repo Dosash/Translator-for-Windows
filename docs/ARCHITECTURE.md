@@ -33,7 +33,7 @@ installer/                      Inno Setup script
 | Module | Paths | Responsibility |
 |---|---|---|
 | Core | `src/Translator/Core/**` | `AppLanguage`, `L10n`, `SettingsStore`, `TranslatorModel`, `HistoryStore`, `GoogleTranslateEngine`, `UpdateChecker`, `SpeechService`, `DebugLog`, `Hotkey` |
-| Platform | `src/Translator/Platform/**` | hotkeys, clipboard, selection grab (Ctrl+C), paste (Ctrl+V), selection location (UI Automation / caret / mouse), tray icon, autostart, single instance + IPC, monitors |
+| Platform | `src/Translator/Platform/**` | hotkeys, clipboard, selection grab / paste (chord depends on the target app, see `InputProfile`), selection location (UI Automation / caret / mouse), tray icon, autostart, single instance + IPC, monitors |
 | Offline | `src/Translator.Offline/**` | model catalog, downloads, tokenizer, ONNX inference, language detection |
 | UI | `src/Translator/UI/**`, `App.xaml(.cs)`, `AppController.cs` | themes, styles, windows, window effects (DWM backdrop, corners) |
 | Build | `tools/**`, `installer/**`, `build.ps1`, `.github/**`, `README.md` | icon, publish, installer, CI/CD, docs |
@@ -62,15 +62,22 @@ Tests mirror the module folders: `tests/Translator.Tests/{Core,Platform,Offline}
 |---|---|
 | Menu bar icon, no Dock icon | Notification area (tray) icon, no taskbar button |
 | Floating panel under the status item | Borderless panel above the tray icon; closes on outside click / Esc; draggable |
-| `⌃⌥T` — translate selection (simulated `⌘C`, Accessibility permission) | `Ctrl+Alt+T` — simulated `Ctrl+C`, no permission needed; translation bubble next to the selection |
+| `⌃⌥T` — translate selection (simulated `⌘C`, Accessibility permission) | `Ctrl+Alt+T` — simulated copy chord, no permission needed; translation bubble next to the selection |
 | `⌃⌥C` — translate clipboard | `Ctrl+Alt+C` |
 | `⇧⌘E` — macOS Service | `Ctrl+Alt+Space` — show/hide the panel; `Translator.exe --translate "text"` |
-| “Replace” in the bubble (simulated `⌘V`) | “Replace”: restore focus to the source window, simulated `Ctrl+V` |
+| “Replace” in the bubble (simulated `⌘V`) | “Replace”: restore focus to the source window, simulated paste chord |
 | Apple Translation offline | Opus-MT via ONNX Runtime, downloaded per language |
 | Speech: AVSpeechSynthesizer | `Windows.Media.SpeechSynthesis` |
 | Launch at login: SMAppService | `HKCU\...\Run` |
 | Themes Calm / Neon / Frost Glass, system accent | Same themes; Mica/Acrylic backdrop on Windows 11, Windows accent color |
 | Update check via GitHub Releases | Same (`Dosash/Translator-for-Windows`) |
+
+The copy/paste chord is not always `Ctrl+C`/`Ctrl+V`: `InputProfile.Classify` looks at the target
+window's process image name and window class and picks one of three profiles — terminals and
+IDEs/editors with an embedded terminal use `Ctrl+Insert`/`Shift+Insert` (a plain `Ctrl+C` with
+nothing selected is the interrupt key in a terminal and would kill whatever command is running);
+PuTTY/KiTTY copy on selection, so no copy keystroke is sent and the clipboard is read as-is; every
+other app keeps `Ctrl+C`/`Ctrl+V`. See `Platform/InputProfile.cs` for the table.
 
 Translation flow (`TranslatorModel.Translate`):
 
