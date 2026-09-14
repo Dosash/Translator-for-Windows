@@ -280,7 +280,7 @@ public sealed class AppController : IDisposable
             string? selected;
             try
             {
-                selected = (await SelectionGrabber.GrabSelectedTextAsync())?.Trim();
+                selected = (await SelectionGrabber.GrabSelectedTextAsync(target))?.Trim();
             }
             catch (Exception ex)
             {

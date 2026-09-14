@@ -32,9 +32,44 @@ internal static class InputSimulator
         }
     }
 
-    public static void SendCtrlC() => SendChord(NativeMethods.VK_C);
+    /// <summary>Copy for <paramref name="chord"/>'s profile. Sends nothing for <see cref="CopyPasteChord.CopyOnSelect"/> —
+    /// those apps already copied on selection, so there is no keystroke to send.</summary>
+    public static void SendCopyChord(CopyPasteChord chord)
+    {
+        switch (chord)
+        {
+            case CopyPasteChord.CtrlCV:
+                SendChord(NativeMethods.VK_CONTROL, NativeMethods.VK_C);
+                break;
+            case CopyPasteChord.InsertChord:
+                SendChord(NativeMethods.VK_CONTROL, NativeMethods.VK_INSERT);
+                break;
+            case CopyPasteChord.CopyOnSelect:
+                RecordedChords?.Add(null);
+                break;
+        }
+    }
 
-    public static void SendCtrlV() => SendChord(NativeMethods.VK_V);
+    /// <summary>Paste for <paramref name="chord"/>'s profile.</summary>
+    public static void SendPasteChord(CopyPasteChord chord)
+    {
+        switch (chord)
+        {
+            case CopyPasteChord.CtrlCV:
+                SendChord(NativeMethods.VK_CONTROL, NativeMethods.VK_V);
+                break;
+            case CopyPasteChord.InsertChord:
+            case CopyPasteChord.CopyOnSelect:
+                SendChord(NativeMethods.VK_SHIFT, NativeMethods.VK_INSERT);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Test seam: when set, chords are recorded here as (modifier, key) instead of really being sent —
+    /// so a "no key was sent" (<see cref="CopyPasteChord.CopyOnSelect"/> copy) can be asserted too.
+    /// </summary>
+    internal static List<(int Modifier, int Vk)?>? RecordedChords { get; set; }
 
     private static bool AnyModifierHeld()
     {
@@ -68,14 +103,19 @@ internal static class InputSimulator
         SendInputs(inputs);
     }
 
-    private static void SendChord(int vk)
+    private static void SendChord(int modifierVk, int vk)
     {
+        if (RecordedChords is { } recorded)
+        {
+            recorded.Add((modifierVk, vk));
+            return;
+        }
         SendInputs(
         [
-            KeyInput(NativeMethods.VK_CONTROL, down: true),
+            KeyInput(modifierVk, down: true),
             KeyInput(vk, down: true),
             KeyInput(vk, down: false),
-            KeyInput(NativeMethods.VK_CONTROL, down: false),
+            KeyInput(modifierVk, down: false),
         ]);
     }
 
