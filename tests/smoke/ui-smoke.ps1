@@ -111,12 +111,19 @@ public static class SmokeNative
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hwnd);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int max);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd, StringBuilder text, int max);
+    [DllImport("user32.dll")] private static extern IntPtr GetWindowDC(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hwnd, IntPtr dc);
+    [DllImport("user32.dll")] private static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleBitmap(IntPtr dc, int width, int height);
+    [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr gdiObject);
+    [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
+    [DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr gdiObject);
 
     /// <summary>Visible top-level windows of a process larger than a few pixels (the hidden 1x1 menu host doesn't count).</summary>
-    public static List<string> VisibleWindows(int processId)
+    public static List<IntPtr> VisibleWindowHandles(int processId)
     {
-        var result = new List<string>();
+        var result = new List<IntPtr>();
         EnumWindows((hwnd, _) =>
         {
             uint pid;
@@ -124,15 +131,52 @@ public static class SmokeNative
             GetWindowThreadProcessId(hwnd, out pid);
             if (pid == (uint)processId && IsWindowVisible(hwnd) && GetWindowRect(hwnd, out r) && r.Right - r.Left > 8 && r.Bottom - r.Top > 8)
             {
-                var title = new StringBuilder(256);
-                var className = new StringBuilder(256);
-                GetWindowText(hwnd, title, title.Capacity);
-                GetClassName(hwnd, className, className.Capacity);
-                result.Add(string.Format("'{0}' at {1},{2} size {3}x{4} dpi {5}", title, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, GetDpiForWindow(hwnd)));
+                result.Add(hwnd);
             }
             return true;
         }, IntPtr.Zero);
         return result;
+    }
+
+    public static List<string> VisibleWindows(int processId)
+    {
+        var result = new List<string>();
+        foreach (var hwnd in VisibleWindowHandles(processId))
+        {
+            RECT r;
+            GetWindowRect(hwnd, out r);
+            var title = new StringBuilder(256);
+            GetWindowText(hwnd, title, title.Capacity);
+            result.Add(string.Format("'{0}' at {1},{2} size {3}x{4} dpi {5}", title, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, GetDpiForWindow(hwnd)));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// The window's own pixels (PrintWindow with PW_RENDERFULLCONTENT), also when something covers it: the
+    /// hosted ARM64 image keeps its session at the OOBE screen. Returns an HBITMAP the caller deletes, or zero.
+    /// </summary>
+    public static IntPtr CaptureWindow(IntPtr hwnd)
+    {
+        RECT r;
+        if (!GetWindowRect(hwnd, out r))
+        {
+            return IntPtr.Zero;
+        }
+        var windowDc = GetWindowDC(hwnd);
+        var memoryDc = CreateCompatibleDC(windowDc);
+        var bitmap = CreateCompatibleBitmap(windowDc, r.Right - r.Left, r.Bottom - r.Top);
+        var previous = SelectObject(memoryDc, bitmap);
+        var ok = PrintWindow(hwnd, memoryDc, 2);
+        SelectObject(memoryDc, previous);
+        DeleteDC(memoryDc);
+        ReleaseDC(hwnd, windowDc);
+        if (!ok)
+        {
+            DeleteObject(bitmap);
+            return IntPtr.Zero;
+        }
+        return bitmap;
     }
 }
 '@
@@ -261,6 +305,23 @@ function Save-Screenshot([string]$name, [string]$context) {
     }
 }
 
+function Save-WindowCaptures($process, [string]$name, [string]$context) {
+    New-Item -ItemType Directory -Force -Path $ShotsDir | Out-Null
+    $index = 0
+    foreach ($hwnd in [SmokeNative]::VisibleWindowHandles($process.Id)) {
+        $index++
+        $suffix = if ($index -eq 1) { '' } else { $index }
+        $hbitmap = [SmokeNative]::CaptureWindow($hwnd)
+        if ($hbitmap -eq [IntPtr]::Zero) { Add-Warning "${context}: PrintWindow capture failed"; continue }
+        try {
+            $image = [Drawing.Image]::FromHbitmap($hbitmap)
+            try { $image.Save((Join-Path $ShotsDir "$name-window$suffix.png"), [Drawing.Imaging.ImageFormat]::Png) } finally { $image.Dispose() }
+        }
+        catch { Add-Warning "${context}: saving the window capture failed ($($_.Exception.Message))" }
+        finally { [void][SmokeNative]::DeleteObject($hbitmap) }
+    }
+}
+
 function Start-App([string]$exe, [string]$context) {
     $logStart = Get-LogCount
     $process = Start-Process -FilePath $exe -PassThru
@@ -304,7 +365,13 @@ function Stop-App($app, [string]$context) {
         $app.Process.Kill($true)
     }
     $lines = Test-LogSince $app.LogStart $context
-    if (-not ($lines -match 'TrayIcon: removed')) { Add-Failure "${context}: no 'TrayIcon: removed' in debug.log after --quit" }
+    if (-not ($lines -match 'AppController: shutting down')) { Add-Failure "${context}: no clean shutdown in debug.log after --quit" }
+    if ($lines -match 'TrayIcon: added') {
+        if (-not ($lines -match 'TrayIcon: removed')) { Add-Failure "${context}: tray icon was added but not removed on --quit" }
+    }
+    else {
+        Add-Warning 'The tray icon could not be added in this session (no notification area?); its removal is untested here'
+    }
 }
 
 function Get-UsedGlyphs {
@@ -376,7 +443,12 @@ function Test-Environment {
             [SmokeNative]::GetSystemMetrics(78), [SmokeNative]::GetSystemMetrics(79), [SmokeNative]::GetSystemMetrics(76), `
             [SmokeNative]::GetSystemMetrics(77), [SmokeNative]::GetSystemMetrics(80), [SmokeNative]::GetDpiForSystem())
     $personalize = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -ErrorAction SilentlyContinue
-    Add-Note "Transparency effects: $(if ($null -eq $personalize.EnableTransparency) { 'not set' } else { $personalize.EnableTransparency }); build supports DWM system backdrop (22621+): $([int]$os.CurrentBuild -ge 22621)"
+    $explorer = [bool](Get-Process -Name explorer -ErrorAction SilentlyContinue)
+    Add-Note "Explorer shell running: $explorer"
+    if (-not $explorer) {
+        Add-Warning 'No Explorer shell in this session (hosted image still at OOBE?): no tray icon, and full-screen captures may not show the app - see the *-window.png captures'
+    }
+    Add-Note "Transparency effects:$(if ($null -eq $personalize.EnableTransparency) { 'not set' } else { $personalize.EnableTransparency }); build supports DWM system backdrop (22621+): $([int]$os.CurrentBuild -ge 22621)"
     Test-Fonts
 }
 
@@ -404,6 +476,7 @@ function Test-Windows {
             # Let the first frame and DWM effects settle before the capture.
             Start-Sleep -Milliseconds 1500
             Save-Screenshot "$theme-$window" $context
+            Save-WindowCaptures $app.Process "$theme-$window" $context
             Stop-App $app $context
         }
     }
@@ -500,6 +573,7 @@ function Test-Installer {
         if ((Wait-VisibleWindows $app.Process 15).Count -eq 0) { Add-Failure 'installed: no visible panel' }
         Start-Sleep -Milliseconds 1500
         Save-Screenshot 'installed-panel' 'installed'
+        Save-WindowCaptures $app.Process 'installed-panel' 'installed'
         if ($app.Process.HasExited) { Add-Failure "installed: app exited (code $($app.Process.ExitCode))" }
     }
 
@@ -515,8 +589,9 @@ function Test-Installer {
     if ($app) {
         if (-not $app.Process.WaitForExit(10000)) { Add-Failure 'installed: app still running after uninstall'; $app.Process.Kill($true) }
         $lines = Test-LogSince $app.LogStart 'installed'
-        if ($lines -match 'TrayIcon: removed') { Add-Note 'Uninstaller quit the running app cleanly (--quit)' }
-        else { Add-Failure 'installed: the app was not quit cleanly by the uninstaller (no "TrayIcon: removed")' }
+        if ($lines -match 'AppController: shutting down') { Add-Note 'Uninstaller quit the running app cleanly (--quit)' }
+        else { Add-Failure 'installed: the app was not quit cleanly by the uninstaller (no "AppController: shutting down")' }
+        if (($lines -match 'TrayIcon: added') -and -not ($lines -match 'TrayIcon: removed')) { Add-Failure 'installed: tray icon not removed on uninstall' }
     }
     if (Get-RunValue) { Add-Failure 'HKCU Run value still present after uninstall' } else { Add-Note 'HKCU Run value removed by uninstall' }
     if (Test-Path $installedExe) { Add-Failure "Translator.exe still present in $InstallDir after uninstall" }

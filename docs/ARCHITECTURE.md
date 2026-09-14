@@ -132,7 +132,11 @@ mutex/pipe names get a hash of that directory, so such an instance never talks t
 |---|---|---|
 | `windows-2022` (x64) | Windows 10 21H2 generation (build 20348) | no DWM system backdrop, no Segoe Fluent Icons / Segoe UI Variable, installer install/uninstall |
 | `windows-2025` (x64) | Windows 11 24H2 generation (build 26100) | Mica/Acrylic path |
-| `windows-11-arm` (win-arm64) | Windows 11 on ARM64 | native ARM64 WPF and ONNX Runtime |
+| `windows-11-arm` (win-arm64) | Windows 11 on ARM64 | native ARM64 WPF and ONNX Runtime (checked via the PE machine type) |
+
+The hosted ARM64 image keeps its interactive session at the first-sign-in (OOBE) screen: there is no
+notification area and full-screen captures show only OOBE. The script therefore also saves each app window
+with `PrintWindow` (`*-window.png`), and tray icon removal is only verified where the icon could be added.
 
 The script publishes the app for the runner RID, opens every window in every theme with `--open` under
 an isolated `TRANSLATOR_DATA_DIR`, captures the virtual screen, fails on unhandled exceptions in
