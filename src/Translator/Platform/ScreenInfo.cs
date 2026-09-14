@@ -36,10 +36,38 @@ public static class ScreenInfo
         return pixels.Width > 0 && pixels.Height > 0 ? pixels : null;
     }
 
-    /// <summary>1.0 at 96 DPI (100% scaling).</summary>
-    public static double GetScale(PixelRect near)
+    /// <summary>Every monitor's bounds, work area and scale, in enumeration order.</summary>
+    public static IReadOnlyList<MonitorMetrics> GetAllMonitors()
     {
-        var monitor = MonitorFromRect(near);
+        var handles = new List<IntPtr>();
+        NativeMethods.MonitorEnumProc callback = (monitor, _, _, _) =>
+        {
+            handles.Add(monitor);
+            return true;
+        };
+        if (!NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, callback, IntPtr.Zero))
+        {
+            DebugLog.Write("ScreenInfo.GetAllMonitors: EnumDisplayMonitors failed");
+        }
+        GC.KeepAlive(callback);
+
+        var monitors = new List<MonitorMetrics>(handles.Count);
+        foreach (var handle in handles)
+        {
+            var info = new NativeMethods.MONITORINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MONITORINFO>() };
+            if (NativeMethods.GetMonitorInfo(handle, ref info))
+            {
+                monitors.Add(new MonitorMetrics(info.rcMonitor.ToPixelRect(), info.rcWork.ToPixelRect(), GetScale(handle)));
+            }
+        }
+        return monitors;
+    }
+
+    /// <summary>1.0 at 96 DPI (100% scaling).</summary>
+    public static double GetScale(PixelRect near) => GetScale(MonitorFromRect(near));
+
+    private static double GetScale(IntPtr monitor)
+    {
         if (monitor == IntPtr.Zero)
         {
             return 1.0;
