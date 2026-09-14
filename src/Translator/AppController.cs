@@ -171,6 +171,34 @@ public sealed class AppController : IDisposable
             case CliCommandKind.Normal when fromAnotherInstance:
                 ShowPanel(PanelAnchor.Cursor);
                 break;
+            case CliCommandKind.Open when command.Window is { } window:
+                OpenWindow(window);
+                break;
+            case CliCommandKind.Quit:
+                Quit();
+                break;
+        }
+    }
+
+    private void OpenWindow(AppWindowKind window)
+    {
+        switch (window)
+        {
+            case AppWindowKind.Panel:
+                ShowPanel(PanelAnchor.Cursor);
+                break;
+            case AppWindowKind.Settings:
+                ShowSettings();
+                break;
+            case AppWindowKind.History:
+                ShowHistory();
+                break;
+            case AppWindowKind.Offline:
+                ShowOfflineLanguages();
+                break;
+            case AppWindowKind.FirstRun:
+                ShowFirstRun();
+                break;
         }
     }
 

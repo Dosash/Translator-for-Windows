@@ -272,7 +272,10 @@ public sealed class TrayIcon : IDisposable
         if (_added && _hwndSource is not null)
         {
             var data = BuildData(0);
-            NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_DELETE, ref data);
+            // Smoke tests look for these lines to tell a clean exit from a killed process.
+            DebugLog.Write(NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_DELETE, ref data)
+                ? "TrayIcon: removed"
+                : "TrayIcon: NIM_DELETE failed");
         }
         if (_hIcon != IntPtr.Zero)
         {

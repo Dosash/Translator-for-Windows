@@ -11,20 +11,51 @@ public enum CliCommandKind
     Autostart,
     /// <summary>Open the panel and translate <see cref="CliCommand.Text"/>.</summary>
     Translate,
+    /// <summary>Open <see cref="CliCommand.Window"/> (starting the app if needed).</summary>
+    Open,
+    /// <summary>Ask the running instance to exit.</summary>
+    Quit,
     TestTranslate,
     TestOffline,
     /// <summary>A known flag with missing arguments; <see cref="CliCommand.Error"/> says what's wrong.</summary>
     Invalid,
 }
 
-public sealed record CliCommand(CliCommandKind Kind, string? Text = null, string? Source = null, string? Target = null, string? Error = null);
+/// <summary>Windows reachable with <c>--open</c>.</summary>
+public enum AppWindowKind
+{
+    Panel,
+    Settings,
+    History,
+    Offline,
+    FirstRun,
+}
+
+public sealed record CliCommand(
+    CliCommandKind Kind,
+    string? Text = null,
+    string? Source = null,
+    string? Target = null,
+    string? Error = null,
+    AppWindowKind? Window = null);
 
 /// <summary>Parses the command line described in docs/ARCHITECTURE.md. Pure, unit-tested.</summary>
 public static class CommandLine
 {
     public const string TranslateFlag = "--translate";
+    public const string OpenFlag = "--open";
+    public const string QuitFlag = "--quit";
     public const string TestTranslateFlag = "--test-translate";
     public const string TestOfflineFlag = "--test-offline";
+
+    private static readonly Dictionary<string, AppWindowKind> WindowNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["panel"] = AppWindowKind.Panel,
+        ["settings"] = AppWindowKind.Settings,
+        ["history"] = AppWindowKind.History,
+        ["offline"] = AppWindowKind.Offline,
+        ["firstrun"] = AppWindowKind.FirstRun,
+    };
 
     public static CliCommand Parse(IReadOnlyList<string> args)
     {
@@ -49,6 +80,12 @@ public static class CommandLine
                     return rest.Count >= 1
                         ? new CliCommand(CliCommandKind.Translate, rest[0])
                         : Invalid($"Usage: Translator.exe {TranslateFlag} \"text\"");
+                case OpenFlag:
+                    return rest.Count >= 1 && WindowNames.TryGetValue(rest[0].Trim(), out var window)
+                        ? new CliCommand(CliCommandKind.Open, Window: window)
+                        : Invalid($"Usage: Translator.exe {OpenFlag} {string.Join('|', WindowNames.Keys)}");
+                case QuitFlag:
+                    return new CliCommand(CliCommandKind.Quit);
                 case Autostart.LaunchArgument:
                     return new CliCommand(CliCommandKind.Autostart);
             }

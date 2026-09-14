@@ -84,6 +84,39 @@ public class CommandLineTests
     }
 
     [Theory]
+    [InlineData("panel", AppWindowKind.Panel)]
+    [InlineData("settings", AppWindowKind.Settings)]
+    [InlineData("history", AppWindowKind.History)]
+    [InlineData("offline", AppWindowKind.Offline)]
+    [InlineData("firstrun", AppWindowKind.FirstRun)]
+    [InlineData("Settings", AppWindowKind.Settings)]
+    public void Open_names_a_window(string name, AppWindowKind window)
+    {
+        var command = CommandLine.Parse(["--open", name]);
+
+        Assert.Equal(CliCommandKind.Open, command.Kind);
+        Assert.Equal(window, command.Window);
+    }
+
+    [Theory]
+    [InlineData]
+    [InlineData("bubble")]
+    [InlineData("")]
+    public void Open_without_a_known_window_is_invalid(params string[] rest)
+    {
+        var command = CommandLine.Parse(["--open", .. rest]);
+
+        Assert.Equal(CliCommandKind.Invalid, command.Kind);
+        Assert.Contains("firstrun", command.Error);
+    }
+
+    [Fact]
+    public void Quit_flag()
+    {
+        Assert.Equal(CliCommandKind.Quit, CommandLine.Parse(["--QUIT"]).Kind);
+    }
+
+    [Theory]
     [InlineData("Привет, мир", "ru", "en")]
     [InlineData("Hello world", "en", "ru")]
     [InlineData("Добрий день", "ru", "en")]

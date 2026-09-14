@@ -41,6 +41,40 @@ public sealed class SingleInstance : IDisposable
         return new SingleInstance(mutex, PipeName(appId));
     }
 
+    /// <summary>True while an instance for <paramref name="appId"/> exists; the mutex name disappears once its owner has closed it.</summary>
+    public static bool IsRunning(string appId)
+    {
+        try
+        {
+            if (!Mutex.TryOpenExisting(MutexName(appId), out var mutex))
+            {
+                return false;
+            }
+            mutex.Dispose();
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Exists, but owned by an instance with different rights (e.g. elevated).
+            return true;
+        }
+    }
+
+    /// <summary>Polls until the instance for <paramref name="appId"/> has shut down. Returns false on timeout.</summary>
+    public static bool WaitUntilNotRunning(string appId, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (IsRunning(appId))
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                return false;
+            }
+            Thread.Sleep(50);
+        }
+        return true;
+    }
+
     /// <summary>Forwards <paramref name="args"/> to the running instance's pipe. Returns false if nobody is listening.</summary>
     public static bool SendToPrimary(string appId, string[] args, TimeSpan timeout)
     {

@@ -10,8 +10,11 @@ Console.OutputEncoding = Encoding.UTF8;
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
 var arguments = args.ToList();
+// Same default as the app, including its TRANSLATOR_DATA_DIR override.
 var modelsDirectory = TakeOption(arguments, "--models")
-    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Translator", "models");
+    ?? (Environment.GetEnvironmentVariable("TRANSLATOR_DATA_DIR") is { Length: > 0 } dataDirectory
+        ? Path.Combine(Path.GetFullPath(Environment.ExpandEnvironmentVariables(dataDirectory)), "models")
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Translator", "models"));
 var threadsOption = TakeOption(arguments, "--threads");
 var runsOption = TakeOption(arguments, "--runs");
 var sourceSpmIds = arguments.Remove("--spm-ids");
